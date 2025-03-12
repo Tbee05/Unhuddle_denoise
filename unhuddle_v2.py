@@ -332,9 +332,19 @@ def generate_pseudocolor_mask(mask):
 
 
 # @debug_log
-def load_fov_files(fov_folder):
+def load_fov_files(fov_folder, mask_pattern="*_0.tiff"):
+    """
+    Loads file paths for a given FOV folder using specified patterns.
+    
+    Args:
+      fov_folder (str): Path to the FOV folder.
+      mask_pattern (str): Wildcard pattern for the mask file (default: "*_0.tiff").
+    
+    Returns:
+      dict: A dictionary containing lists of file paths for each key.
+    """
     files = {
-        "mask": glob.glob(os.path.join(fov_folder, '*_0.tiff')),
+        "mask": glob.glob(os.path.join(fov_folder, mask_pattern)),
         "dna2": glob.glob(os.path.join(fov_folder, '*DNA2.ome.tiff')),
         "dna1": glob.glob(os.path.join(fov_folder, '*DNA1.ome.tiff')),
         "histoneh3": glob.glob(os.path.join(fov_folder, '*HistoneH3.ome.tiff'))
@@ -1165,7 +1175,7 @@ def compute_normalized_intensities_for_fov(fov_folder, cell_mask, corrected_sum_
 def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
                          normalized_output_dir, original_sum_dir, original_mean_dir,
                          corrected_sum_dir, corrected_mean_dir, create_nuclear_mask,
-                         create_deepcell_mask, geckodriver_path, deepcell_url):
+                         create_deepcell_mask, geckodriver_path, deepcell_url, mask_pattern):
     result = {"fov": fov_path}
     try:
         if create_deepcell_mask:
@@ -1181,7 +1191,7 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
             else:
                 result["deepcell_processing"] = "Overlay file not created"
 
-        files = load_fov_files(fov_path)
+        files = load_fov_files(fov_path, mask_pattern)
         cell_mask = process_cell_mask(fov_path, files["mask"])
         if create_nuclear_mask:
             nuclear_mask = process_nuclear_mask(fov_path, cell_mask, files)
@@ -1257,6 +1267,8 @@ def main():
                         help="URL for the DeepCell website.")
     parser.add_argument("--fovs", nargs="*", default=None,
                         help="List of FOV folder names to process. If not specified, all FOV folders in base_path will be processed.")
+    parser.add_argument("--mask_pattern", type=str, default="*_0.tiff",
+                        help="Wildcard pattern for the mask file (default: '*_0.tiff')")
     args = parser.parse_args()
 
     output_base_path = args.output_base_path
@@ -1306,7 +1318,8 @@ def main():
                 args.create_nuclear_mask,
                 args.create_deepcell_mask,
                 args.geckodriver_path,
-                args.deepcell_url
+                args.deepcell_url,
+                args.mask_pattern
             ): fov for fov in fov_folders
         }
         for future in tqdm(as_completed(future_to_fov), total=len(fov_folders), desc="Processing FOVs"):

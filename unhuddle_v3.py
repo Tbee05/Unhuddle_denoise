@@ -33,6 +33,14 @@ Final Integrated Pipeline:
 """
 
 import os
+# Limit the number of threads used by various libraries
+os.environ["OMP_NUM_THREADS"] = "1"  # OpenMP
+os.environ["MKL_NUM_THREADS"] = "1"  # Intel Math Kernel Library
+os.environ["NUMEXPR_NUM_THREADS"] = "1"  # Numexpr
+os.environ["OPENBLAS_NUM_THREADS"] = "1"  # OpenBLAS
+# os.environ["VECLIB_MAXIMUM_THREADS"] = "1"   # macOS Accelerate framework (if applicable)
+# os.environ["BLIS_NUM_THREADS"] = "1"         # BLIS (if used)
+
 import glob
 import signal
 import random
@@ -332,9 +340,35 @@ def generate_pseudocolor_mask(mask):
 
 
 # @debug_log
-def load_fov_files(fov_folder):
+def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
+    """
+    Loads file paths for a given FOV folder using specified patterns.
+
+    Args:
+      fov_folder (str): Path to the FOV folder.
+      mask_patterns (list[str]): List of wildcard patterns for the mask file.
+
+    Returns:
+      dict: A dictionary containing lists of file paths for each key.
+      
+    Raises:
+      ValueError: If the total number of mask files matching the patterns is not exactly one.
+    """
+    # Combine results from all provided mask patterns
+    mask_files = []
+    for pattern in mask_patterns:
+        found = glob.glob(os.path.join(fov_folder, pattern))
+        mask_files.extend(found)
+    
+    # Enforce that exactly one mask file is found.
+    if len(mask_files) != 1:
+        raise ValueError(
+            f"Expected exactly one mask file in {fov_folder} matching patterns {mask_patterns}, "
+            f"but found {len(mask_files)}: {mask_files}"
+        )
+    
     files = {
-        "mask": glob.glob(os.path.join(fov_folder, '*_0.tiff')),
+        "mask": mask_files,  # This will be a list with one file.
         "dna2": glob.glob(os.path.join(fov_folder, '*DNA2.ome.tiff')),
         "dna1": glob.glob(os.path.join(fov_folder, '*DNA1.ome.tiff')),
         "histoneh3": glob.glob(os.path.join(fov_folder, '*HistoneH3.ome.tiff'))
@@ -1165,7 +1199,7 @@ def compute_normalized_intensities_for_fov(fov_folder, cell_mask, corrected_sum_
 def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
                          normalized_output_dir, original_sum_dir, original_mean_dir,
                          corrected_sum_dir, corrected_mean_dir, create_nuclear_mask,
-                         create_deepcell_mask, geckodriver_path, deepcell_url):
+                         create_deepcell_mask, geckodriver_path, deepcell_url, mask_pattern):
     result = {"fov": fov_path}
     try:
         if create_deepcell_mask:
@@ -1181,7 +1215,7 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
             else:
                 result["deepcell_processing"] = "Overlay file not created"
 
-        files = load_fov_files(fov_path)
+        files = load_fov_files(fov_path, mask_pattern)
         cell_mask = process_cell_mask(fov_path, files["mask"])
         if create_nuclear_mask:
             nuclear_mask = process_nuclear_mask(fov_path, cell_mask, files)
@@ -1257,6 +1291,11 @@ def main():
                         help="URL for the DeepCell website.")
     parser.add_argument("--fovs", nargs="*", default=None,
                         help="List of FOV folder names to process. If not specified, all FOV folders in base_path will be processed.")
+    parser.add_argument("--mask_pattern", type=str, nargs='+', default=["*_0.tiff"],
+                        help="Wildcard pattern(s) for the mask file (default: '*_0.tiff').")
+    # New flag to check if output exists
+    parser.add_argument("--check_output_exist", action="store_true", default=False,
+                        help="If set, the script will check if output already exists in normalized_output_dir and skip that FOV.")
     args = parser.parse_args()
 
     output_base_path = args.output_base_path
@@ -1268,6 +1307,7 @@ def main():
     corrected_mean_dir = os.path.join(output_base_path, "corrected_mean")
     normalized_output_dir = os.path.join(output_base_path, "unhuddle_normalized")
 
+    # Create all required directories
     for d in [output_base_path, morph_features_dir, protein_features_dir, original_sum_dir,
               original_mean_dir, corrected_sum_dir, corrected_mean_dir, normalized_output_dir]:
         os.makedirs(d, exist_ok=True)
@@ -1277,8 +1317,11 @@ def main():
         os.makedirs(os.path.join(output_base_path, mtype), exist_ok=True)
 
     # Gather FOV folders from the base path.
-    all_fov_folders = [os.path.join(args.base_path, fov) for fov in os.listdir(args.base_path)
-                   if os.path.isdir(os.path.join(args.base_path, fov))]
+    all_fov_folders = [
+        os.path.join(args.base_path, fov)
+        for fov in os.listdir(args.base_path)
+        if os.path.isdir(os.path.join(args.base_path, fov))
+    ]
 
     # If --fovs is provided, filter the FOV folders.
     if args.fovs:
@@ -1286,8 +1329,22 @@ def main():
     else:
         fov_folders = all_fov_folders
 
+    # If the check_output_exist flag is set, filter out FOVs that already have output.
+    if args.check_output_exist:
+        filtered_fov_folders = []
+        for fov in fov_folders:
+            fov_basename = os.path.basename(fov)
+            # Look for any file starting with the fov_basename in normalized_output_dir.
+            pattern = os.path.join(normalized_output_dir, f"{fov_basename}*")
+            matching_outputs = glob.glob(pattern)
+            if matching_outputs:
+                logger.info(f"Skipping FOV '{fov}' as output already exists: {matching_outputs}")
+            else:
+                filtered_fov_folders.append(fov)
+        fov_folders = filtered_fov_folders
+
     if not fov_folders:
-        logger.error("No FOV folders to process. Please check the --fovs flag and base_path.")
+        logger.error("No FOV folders to process. Please check the --fovs flag, base_path, or existing outputs.")
         return
 
     results = {}
@@ -1306,7 +1363,8 @@ def main():
                 args.create_nuclear_mask,
                 args.create_deepcell_mask,
                 args.geckodriver_path,
-                args.deepcell_url
+                args.deepcell_url,
+                args.mask_pattern
             ): fov for fov in fov_folders
         }
         for future in tqdm(as_completed(future_to_fov), total=len(fov_folders), desc="Processing FOVs"):
