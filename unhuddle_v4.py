@@ -33,6 +33,7 @@ Final Integrated Pipeline:
 """
 
 import os
+
 # Limit the number of threads used by various libraries
 os.environ["OMP_NUM_THREADS"] = "1"  # OpenMP
 os.environ["MKL_NUM_THREADS"] = "1"  # Intel Math Kernel Library
@@ -62,16 +63,13 @@ from scipy import ndimage
 from tifffile import imread
 from tqdm import tqdm
 
-
-
-
 # Create subfolders for measure types.
 MEASURE_TYPES = ["corrected_mean", "corrected_sum", "original_mean", "original_sum"]
-
 
 # ---------------------- Logging & Shutdown ---------------------- #
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
 
 def shutdown_handler(signum, frame):
     logging.info("Graceful shutdown initiated.")
@@ -96,7 +94,8 @@ def debug_log(func):
 
     return wrapper
 
-#!/usr/bin/env python3
+
+# !/usr/bin/env python3
 import os
 import re
 import glob
@@ -120,10 +119,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+
+
 # ----- Helper Function: Create DeepCell Overlay ----- #
 def create_deepcell_mask_overlay(fov_path,
                                  red_markers=["DNA1", "DNA2", "HistoneH3"],
-                                 green_markers=["CD7", "CD3", "CD15", "CD11c", "CD68", "CD45RO", "CD45RA", "CD20", "Vimentin"],
+                                 green_markers=["CD7", "CD3", "CD15", "CD11c", "CD68", "CD45RO", "CD45RA", "CD20",
+                                                "Vimentin"],
                                  blue_markers=None):
     """
     Create a DeepCell overlay mask from single-slice TIFFs in fov_path.
@@ -194,9 +196,9 @@ def create_deepcell_mask_overlay(fov_path,
         logger.warning(f"Required markers for red and green channels not found in {fov_path}.")
         return None
 
-    red_8   = clip_0_255(red_channel)
+    red_8 = clip_0_255(red_channel)
     green_8 = clip_0_255(green_channel)
-    blue_8  = clip_0_255(blue_channel) if blue_channel is not None else None
+    blue_8 = clip_0_255(blue_channel) if blue_channel is not None else None
 
     if blue_8 is not None:
         overlay = np.stack((red_8, green_8, blue_8), axis=-1)
@@ -217,6 +219,7 @@ def create_deepcell_mask_overlay(fov_path,
 
     return overlay_file
 
+
 # ----- Helper Function: safe_get ----- #
 def safe_get(driver, url, retries=3, delay=5):
     for attempt in range(retries):
@@ -227,6 +230,7 @@ def safe_get(driver, url, retries=3, delay=5):
             logger.warning(f"Attempt {attempt + 1} failed to load {url}: {e}")
             time.sleep(delay)
     raise Exception(f"Unable to load {url} after {retries} attempts.")
+
 
 # ----- Helper Function: Process DeepCell Overlay ----- #
 def process_deepcell_overlay(overlay_file, output_directory, deepcell_url, geckodriver_path, max_total_wait=300):
@@ -350,7 +354,7 @@ def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
 
     Returns:
       dict: A dictionary containing lists of file paths for each key.
-      
+
     Raises:
       ValueError: If the total number of mask files matching the patterns is not exactly one.
     """
@@ -359,14 +363,14 @@ def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
     for pattern in mask_patterns:
         found = glob.glob(os.path.join(fov_folder, pattern))
         mask_files.extend(found)
-    
+
     # Enforce that exactly one mask file is found.
     if len(mask_files) != 1:
         raise ValueError(
             f"Expected exactly one mask file in {fov_folder} matching patterns {mask_patterns}, "
             f"but found {len(mask_files)}: {mask_files}"
         )
-    
+
     files = {
         "mask": mask_files,  # This will be a list with one file.
         "dna2": glob.glob(os.path.join(fov_folder, '*DNA2.ome.tiff')),
@@ -400,9 +404,9 @@ def process_cell_mask(fov_folder, mask_files):
 
 # @debug_log
 def process_nuclear_mask(fov_folder, cell_mask, files):
-    dna2_signal = io.imread(files["DNA2"][0])
-    dna1_signal = io.imread(files["DNA1"][0])
-    histoneh3_signal = io.imread(files["HistoneH3"][0])
+    dna2_signal = io.imread(files["dna2"][0])
+    dna1_signal = io.imread(files["dna1"][0])
+    histoneh3_signal = io.imread(files["histoneh3"][0])
     logging.info("Loaded nuclear signals.")
 
     nuclear_signal = dna2_signal + dna1_signal + histoneh3_signal
@@ -488,9 +492,6 @@ def process_membrane_masks(fov_folder, cell_mask):
     save_image(exclusion_pseudocolor_path, exclusion_pseudocolor, "pseudocolor membrane exclusion mask")
 
     return membrane_labeled, exclusion_mask
-
-
-
 
 
 # ---------------------- Stage 2 & 4: Feature and Protein Extraction ---------------------- #
@@ -689,6 +690,8 @@ def extract_protein_intensity(fov_folder, protein_features_dir, morph_features, 
     except Exception as e:
         logging.error(f"Error in protein intensity extraction for FOV {fov_folder}: {e}")
         return None  # Return None in case of failure
+
+
 # @debug_log
 def compute_border_interactions(cell_mask, membrane_mask):
     interactions = defaultdict(dict)
@@ -818,7 +821,7 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
             # Check if the coordinate is within the image bounds.
             if 0 <= y < ome_image.shape[0] and 0 <= x < ome_image.shape[1]:
                 pix = ome_image[y, x]
-                #logging.debug(f"At coordinate ({y}, {x}), raw pixel value: {pix}")
+                # logging.debug(f"At coordinate ({y}, {x}), raw pixel value: {pix}")
 
                 # If the pixel value is an array (multi-channel), handle accordingly.
                 if hasattr(pix, "ndim") and pix.ndim > 0:
@@ -845,7 +848,7 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
             if 'intensities' not in data:
                 data['intensities'] = {}
             data['intensities'][marker_name] = intensity_value
-            #logging.info(f"Set intensity for marker '{marker_name}' at coordinate '{coord_str}' to {intensity_value}.")
+            # logging.info(f"Set intensity for marker '{marker_name}' at coordinate '{coord_str}' to {intensity_value}.")
 
     logging.info("Completed intensity integration for interactions.")
     return interactions
@@ -856,13 +859,12 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
 import pandas as pd
 from collections import defaultdict
 
-import pandas as pd
-import numpy as np
-from collections import defaultdict
 import logging
+import numpy as np
+import pandas as pd
+from collections import defaultdict
 
-
-def compute_reallocation(interactions, protein_features):
+def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
     logging.info("start calculating reallocation")
     """
     Group the combined per-coordinate interactions (from border and background)
@@ -885,7 +887,18 @@ def compute_reallocation(interactions, protein_features):
           'reallocated_intensity': { marker: value, ... }
         }
     """
-    # Precompute mean_exclusion_membrane_intensity for each (cell, marker)
+
+    """
+    Similar to the original compute_reallocation, but with additional checks:
+      1) For border interactions, checks that sum(taken) == sum(reallocated).
+      2) Ensures that no border reallocation > total intensity.
+      3) For background, 'lost' intensity is not assigned to any cell. 
+         We do not raise an error if there's leftover unclaimed background,
+         but we verify that the total allocated is <= total_intensity.
+    """
+    logging.info("start calculating reallocation with extra safety checks")
+
+    # 1) Precompute mean_exclusion_membrane_intensity for each (cell, marker)
     mean_intensities = {}
     for cell_idx in protein_features.index:
         for col in protein_features.columns:
@@ -905,18 +918,12 @@ def compute_reallocation(interactions, protein_features):
                             raise
                 mean_intensities[(cell_idx, marker_name)] = val
 
-    # Debug: log summary of mean_intensities
-    logging.debug(f"Computed mean_intensities for {len(mean_intensities)} (cell, marker) pairs.")
-
-    # Our final data structure, storing taken and reallocated intensities
     reallocation = defaultdict(lambda: {
         "taken_intensity": defaultdict(float),
         "reallocated_intensity": defaultdict(float)
     })
 
-    # ----------------------------------
-    # 1) GROUP & PROCESS BORDER INTERACTIONS
-    # ----------------------------------
+    # 2) GROUP & PROCESS BORDER INTERACTIONS
     border_groups = defaultdict(list)
     for coord, data in interactions.items():
         if data.get("type") == "border" and "intensities" in data:
@@ -924,57 +931,83 @@ def compute_reallocation(interactions, protein_features):
             border_groups[key].append(coord)
 
     for (current, neighbors), coords in border_groups.items():
-        logging.debug(f"Processing border group: current={current} (type: {type(current)}), neighbors={neighbors}")
-        # Build the union of all marker sets across the coords in this group
+        # For each group, we also track sums to verify after distribution.
+        # `marker_total_taken` for all border coords in this group
+        # `marker_total_reallocated` for sum across all cells
+        marker_group_taken = defaultdict(float)
+        marker_group_reallocated = defaultdict(float)
+
+        # Build union of all markers
         marker_set = set()
         for coord in coords:
             marker_set.update(interactions[coord]["intensities"].keys())
 
         for marker in marker_set:
-            # Skip if marker name contains 'DNA' or 'Histone'
             if "DNA" in marker or "Histone" in marker:
                 continue
 
+            # Sum intensities for these coords
             total_intensity = 0.0
             for coord in coords:
-                intensity_val = interactions[coord]["intensities"].get(marker, 0)
-                total_intensity += intensity_val
+                total_intensity += interactions[coord]["intensities"].get(marker, 0)
 
-            # Tally up "taken_intensity" for the current cell
+            # Mark that the current cell "takes" it
             reallocation[current]["taken_intensity"][marker] += total_intensity
 
-            # Retrieve means, forcing scalars if needed.
-            current_mean = mean_intensities.get((current, marker), 0)
-            neighbor_means = []
-            for n in neighbors:
-                mval = mean_intensities.get((n, marker), 0)
-                neighbor_means.append(mval)
+            # Bookkeeping for checks
+            marker_group_taken[marker] += total_intensity
 
-            logging.debug(f"Marker: {marker} -- current_mean: {current_mean}, neighbor_means: {neighbor_means}")
+            # Distribute
+            current_mean = mean_intensities.get((current, marker), 0)
+            neighbor_means = [mean_intensities.get(n, 0) 
+                              if isinstance(n, tuple) else mean_intensities.get((n, marker), 0)
+                              for n in neighbors]
+            # (Note: in case `neighbors` are ints, we do get((n, marker), 0). 
+            #  If your code sometimes yields weird tuples, adapt accordingly.)
 
             total_mean = current_mean + sum(neighbor_means)
+
             if total_mean == 0:
                 # Fallback: reallocate all intensity to the current cell
                 reallocation[current]["reallocated_intensity"][marker] += total_intensity
+                # Also track reallocated sum (for checks)
+                marker_group_reallocated[marker] += total_intensity
             else:
+                # Collect cells with nonzero means
                 labels_nonzero = []
                 intensities_nonzero = []
                 if current_mean > 0:
                     labels_nonzero.append(current)
                     intensities_nonzero.append(current_mean)
-                for n, mval in zip(neighbors, neighbor_means):
+                for nb, mval in zip(neighbors, neighbor_means):
                     if mval > 0:
-                        labels_nonzero.append(n)
+                        labels_nonzero.append(nb)
                         intensities_nonzero.append(mval)
 
                 sum_nonzero = sum(intensities_nonzero)
-                for lab, mval in zip(labels_nonzero, intensities_nonzero):
-                    factor = mval / sum_nonzero
-                    reallocation[lab]["reallocated_intensity"][marker] += factor * total_intensity
+                if sum_nonzero == 0:
+                    # Should only happen if all means were <= 0
+                    reallocation[current]["reallocated_intensity"][marker] += total_intensity
+                    marker_group_reallocated[marker] += total_intensity
+                else:
+                    for lab, mval in zip(labels_nonzero, intensities_nonzero):
+                        factor = mval / sum_nonzero
+                        allocated = factor * total_intensity
+                        reallocation[lab]["reallocated_intensity"][marker] += allocated
+                        marker_group_reallocated[marker] += allocated
 
-    # ----------------------------------
-    # 2) GROUP & PROCESS BACKGROUND INTERACTIONS
-    # ----------------------------------
+        # Now check sums for all markers in this group
+        for marker in marker_group_taken.keys():
+            taken_val = marker_group_taken[marker]
+            reallocated_val = marker_group_reallocated[marker]
+            # Make sure we didn't create or destroy intensity
+            if not (abs(taken_val - reallocated_val) <= tol):
+                msg = (f"Border group mismatch for (cell={current}, neighbors={neighbors}), "
+                       f"marker={marker}. Taken={taken_val}, Reallocated={reallocated_val}.")
+                logging.error(msg)
+                # Optionally: raise ValueError(msg)
+
+    # 3) GROUP & PROCESS BACKGROUND INTERACTIONS
     background_groups = defaultdict(list)
     for coord, data in interactions.items():
         if data.get("type") == "background" and "intensities" in data:
@@ -982,6 +1015,11 @@ def compute_reallocation(interactions, protein_features):
             background_groups[key].append(coord)
 
     for cells, coords in background_groups.items():
+        # For background, it's normal that some portion may remain unclaimed 
+        # (if no cell has a nonzero mean).
+        # So we only check that sum(allocated) <= total_intensity.
+        marker_allocated = defaultdict(float)
+
         marker_set = set()
         for coord in coords:
             marker_set.update(interactions[coord]["intensities"].keys())
@@ -999,22 +1037,39 @@ def compute_reallocation(interactions, protein_features):
                 cell_mean = mean_intensities.get((cell, marker), 0)
                 if cell_mean > 0:
                     reallocation[cell]["reallocated_intensity"][marker] += total_intensity
+                    marker_allocated[marker] += total_intensity
             else:
                 nonzero_labels = []
                 nonzero_means = []
-                for cell in cells:
-                    val = mean_intensities.get((cell, marker), 0)
+                for cell_id in cells:
+                    val = mean_intensities.get((cell_id, marker), 0)
                     if val > 0:
-                        nonzero_labels.append(cell)
+                        nonzero_labels.append(cell_id)
                         nonzero_means.append(val)
 
                 if nonzero_labels:
                     sum_nonzero = sum(nonzero_means)
-                    for lab, mval in zip(nonzero_labels, nonzero_means):
-                        factor = mval / sum_nonzero
-                        reallocation[lab]["reallocated_intensity"][marker] += factor * total_intensity
+                    if sum_nonzero == 0:
+                        # No actual claims
+                        # Then no intensity is allocated
+                        pass
+                    else:
+                        for lab, mval in zip(nonzero_labels, nonzero_means):
+                            factor = mval / sum_nonzero
+                            allocated_val = factor * total_intensity
+                            reallocation[lab]["reallocated_intensity"][marker] += allocated_val
+                            marker_allocated[marker] += allocated_val
 
+            # Safety check: ensure allocated <= total
+            if marker_allocated[marker] - total_intensity > tol:
+                msg = (f"Background over-allocation for marker={marker}, "
+                       f"allocated={marker_allocated[marker]:.6f} vs total={total_intensity:.6f}.")
+                logging.error(msg)
+                # Optionally: raise ValueError(msg)
+
+    logging.info("Finished reallocation with safety checks.")
     return dict(reallocation)
+
 
 
 @debug_log
@@ -1136,6 +1191,7 @@ def compute_area_blowup(cell_mask):
     logging.debug(f"compute_area_blowup: Computed blowup areas for {len(df)} cells.")
     return df
 
+
 @debug_log
 def compute_normalized_intensities_for_fov(fov_folder, cell_mask, corrected_sum_df, normalized_output_dir):
     """
@@ -1168,7 +1224,8 @@ def compute_normalized_intensities_for_fov(fov_folder, cell_mask, corrected_sum_
 
     # Merge corrected sum intensities with the area DataFrame
     merged_df = corrected_sum_df.merge(area_df, on="Label", how="left")
-    logging.debug(f"Merged corrected sum intensities with area data. Merged DataFrame columns: {list(merged_df.columns)}")
+    logging.debug(
+        f"Merged corrected sum intensities with area data. Merged DataFrame columns: {list(merged_df.columns)}")
 
     # Ensure 'Blowup_Area' is numeric
     merged_df["Blowup_Area"] = pd.to_numeric(merged_df["Blowup_Area"], errors="coerce")
@@ -1249,14 +1306,15 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
         background_int, _ = compute_background_interactions(cell_mask)
         merged = merge_interactions(border_int, background_int)
         all_interactions = integrate_intensities_for_interactions(fov_path, merged)
-        reallocation = compute_reallocation(all_interactions, protein_features)
+        reallocation = compute_reallocation_with_checks(all_interactions, protein_features, 1e-6)
     except Exception as e:
         logger.error(f"Error in object intensity analysis for {fov_path}: {e}")
         result["object_intensity_error"] = str(e)
 
     try:
         corrected_sum_df = settle_debts_intensity(fov_path, reallocation, morph_features, protein_features,
-                                                    original_sum_dir, original_mean_dir, corrected_sum_dir, corrected_mean_dir)
+                                                  original_sum_dir, original_mean_dir, corrected_sum_dir,
+                                                  corrected_mean_dir)
         result["intensity_settled"] = True
     except Exception as e:
         logger.error(f"Error settling intensities for {fov_path}: {e}")
@@ -1270,6 +1328,7 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
         result["normalized_intensity_error"] = str(e)
 
     return result
+
 
 # ----- Main Entry Point ----- #
 def main():
@@ -1375,6 +1434,7 @@ def main():
             except Exception as e:
                 logger.error(f"Error processing FOV {fov}: {e}")
                 results[fov] = {"fov": fov, "error": str(e)}
+
 
 if __name__ == "__main__":
     main()

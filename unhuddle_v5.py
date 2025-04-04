@@ -33,6 +33,7 @@ Final Integrated Pipeline:
 """
 
 import os
+
 # Limit the number of threads used by various libraries
 os.environ["OMP_NUM_THREADS"] = "1"  # OpenMP
 os.environ["MKL_NUM_THREADS"] = "1"  # Intel Math Kernel Library
@@ -62,16 +63,13 @@ from scipy import ndimage
 from tifffile import imread
 from tqdm import tqdm
 
-
-
-
 # Create subfolders for measure types.
 MEASURE_TYPES = ["corrected_mean", "corrected_sum", "original_mean", "original_sum"]
 
-
 # ---------------------- Logging & Shutdown ---------------------- #
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
 
 def shutdown_handler(signum, frame):
     logging.info("Graceful shutdown initiated.")
@@ -96,7 +94,8 @@ def debug_log(func):
 
     return wrapper
 
-#!/usr/bin/env python3
+
+# !/usr/bin/env python3
 import os
 import re
 import glob
@@ -107,6 +106,7 @@ import time
 import zipfile
 import shutil
 import requests
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import numpy as np
@@ -120,10 +120,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+
+
 # ----- Helper Function: Create DeepCell Overlay ----- #
 def create_deepcell_mask_overlay(fov_path,
                                  red_markers=["DNA1", "DNA2", "HistoneH3"],
-                                 green_markers=["CD7", "CD3", "CD15", "CD11c", "CD68", "CD45RO", "CD45RA", "CD20", "Vimentin"],
+                                 green_markers=["CD7", "CD3", "CD15", "CD11c", "CD68", "CD45RO", "CD45RA", "CD20",
+                                                "Vimentin"],
                                  blue_markers=None):
     """
     Create a DeepCell overlay mask from single-slice TIFFs in fov_path.
@@ -194,9 +197,9 @@ def create_deepcell_mask_overlay(fov_path,
         logger.warning(f"Required markers for red and green channels not found in {fov_path}.")
         return None
 
-    red_8   = clip_0_255(red_channel)
+    red_8 = clip_0_255(red_channel)
     green_8 = clip_0_255(green_channel)
-    blue_8  = clip_0_255(blue_channel) if blue_channel is not None else None
+    blue_8 = clip_0_255(blue_channel) if blue_channel is not None else None
 
     if blue_8 is not None:
         overlay = np.stack((red_8, green_8, blue_8), axis=-1)
@@ -217,6 +220,7 @@ def create_deepcell_mask_overlay(fov_path,
 
     return overlay_file
 
+
 # ----- Helper Function: safe_get ----- #
 def safe_get(driver, url, retries=3, delay=5):
     for attempt in range(retries):
@@ -227,6 +231,7 @@ def safe_get(driver, url, retries=3, delay=5):
             logger.warning(f"Attempt {attempt + 1} failed to load {url}: {e}")
             time.sleep(delay)
     raise Exception(f"Unable to load {url} after {retries} attempts.")
+
 
 # ----- Helper Function: Process DeepCell Overlay ----- #
 def process_deepcell_overlay(overlay_file, output_directory, deepcell_url, geckodriver_path, max_total_wait=300):
@@ -350,7 +355,7 @@ def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
 
     Returns:
       dict: A dictionary containing lists of file paths for each key.
-      
+
     Raises:
       ValueError: If the total number of mask files matching the patterns is not exactly one.
     """
@@ -359,14 +364,14 @@ def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
     for pattern in mask_patterns:
         found = glob.glob(os.path.join(fov_folder, pattern))
         mask_files.extend(found)
-    
+
     # Enforce that exactly one mask file is found.
     if len(mask_files) != 1:
         raise ValueError(
             f"Expected exactly one mask file in {fov_folder} matching patterns {mask_patterns}, "
             f"but found {len(mask_files)}: {mask_files}"
         )
-    
+
     files = {
         "mask": mask_files,  # This will be a list with one file.
         "dna2": glob.glob(os.path.join(fov_folder, '*DNA2.ome.tiff')),
@@ -378,8 +383,12 @@ def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
 
 # @debug_log
 def save_image(path, image, description=""):
-    io.imsave(path, image)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        io.imsave(path, image)
+
     logging.info(f"Saved {description} at: {path}")
+
 
 
 # @debug_log
@@ -400,9 +409,9 @@ def process_cell_mask(fov_folder, mask_files):
 
 # @debug_log
 def process_nuclear_mask(fov_folder, cell_mask, files):
-    dna2_signal = io.imread(files["DNA2"][0])
-    dna1_signal = io.imread(files["DNA1"][0])
-    histoneh3_signal = io.imread(files["HistoneH3"][0])
+    dna2_signal = io.imread(files["dna2"][0])
+    dna1_signal = io.imread(files["dna1"][0])
+    histoneh3_signal = io.imread(files["histoneh3"][0])
     logging.info("Loaded nuclear signals.")
 
     nuclear_signal = dna2_signal + dna1_signal + histoneh3_signal
@@ -472,7 +481,7 @@ def process_membrane_masks(fov_folder, cell_mask):
 
     missing_labels = set(unique_cell_labels) - set(unique_excl_labels)
     if missing_labels:
-        logging.warning(f"Restoring {len(missing_labels)} missing labels in exclusion mask.")
+        logging.info(f"Restoring {len(missing_labels)} missing labels in exclusion mask (too small), fallback-->exclusionmask=cellmask.")
 
         for label in missing_labels:
             # Restore **all pixels** from `cell_mask` for this missing label
@@ -488,9 +497,6 @@ def process_membrane_masks(fov_folder, cell_mask):
     save_image(exclusion_pseudocolor_path, exclusion_pseudocolor, "pseudocolor membrane exclusion mask")
 
     return membrane_labeled, exclusion_mask
-
-
-
 
 
 # ---------------------- Stage 2 & 4: Feature and Protein Extraction ---------------------- #
@@ -689,6 +695,8 @@ def extract_protein_intensity(fov_folder, protein_features_dir, morph_features, 
     except Exception as e:
         logging.error(f"Error in protein intensity extraction for FOV {fov_folder}: {e}")
         return None  # Return None in case of failure
+
+
 # @debug_log
 def compute_border_interactions(cell_mask, membrane_mask):
     interactions = defaultdict(dict)
@@ -818,7 +826,7 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
             # Check if the coordinate is within the image bounds.
             if 0 <= y < ome_image.shape[0] and 0 <= x < ome_image.shape[1]:
                 pix = ome_image[y, x]
-                #logging.debug(f"At coordinate ({y}, {x}), raw pixel value: {pix}")
+                # logging.debug(f"At coordinate ({y}, {x}), raw pixel value: {pix}")
 
                 # If the pixel value is an array (multi-channel), handle accordingly.
                 if hasattr(pix, "ndim") and pix.ndim > 0:
@@ -845,7 +853,7 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
             if 'intensities' not in data:
                 data['intensities'] = {}
             data['intensities'][marker_name] = intensity_value
-            #logging.info(f"Set intensity for marker '{marker_name}' at coordinate '{coord_str}' to {intensity_value}.")
+            # logging.info(f"Set intensity for marker '{marker_name}' at coordinate '{coord_str}' to {intensity_value}.")
 
     logging.info("Completed intensity integration for interactions.")
     return interactions
@@ -856,13 +864,13 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
 import pandas as pd
 from collections import defaultdict
 
-import pandas as pd
-import numpy as np
-from collections import defaultdict
 import logging
+import numpy as np
+import pandas as pd
+from collections import defaultdict
 
 
-def compute_reallocation(interactions, protein_features):
+def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
     logging.info("start calculating reallocation")
     """
     Group the combined per-coordinate interactions (from border and background)
@@ -885,7 +893,17 @@ def compute_reallocation(interactions, protein_features):
           'reallocated_intensity': { marker: value, ... }
         }
     """
-    # Precompute mean_exclusion_membrane_intensity for each (cell, marker)
+
+    """
+    Similar to the original compute_reallocation, but with additional checks:
+      1) For border interactions, checks that sum(taken) == sum(reallocated).
+      2) Ensures that no border reallocation > total intensity.
+      3) For background, 'lost' intensity is not assigned to any cell. 
+         We do not raise an error if there's leftover unclaimed background,
+         but we verify that the total allocated is <= total_intensity.
+    """
+
+    # 1) Precompute mean_exclusion_membrane_intensity for each (cell, marker)
     mean_intensities = {}
     for cell_idx in protein_features.index:
         for col in protein_features.columns:
@@ -905,18 +923,12 @@ def compute_reallocation(interactions, protein_features):
                             raise
                 mean_intensities[(cell_idx, marker_name)] = val
 
-    # Debug: log summary of mean_intensities
-    logging.debug(f"Computed mean_intensities for {len(mean_intensities)} (cell, marker) pairs.")
-
-    # Our final data structure, storing taken and reallocated intensities
     reallocation = defaultdict(lambda: {
         "taken_intensity": defaultdict(float),
         "reallocated_intensity": defaultdict(float)
     })
 
-    # ----------------------------------
-    # 1) GROUP & PROCESS BORDER INTERACTIONS
-    # ----------------------------------
+    # 2) GROUP & PROCESS BORDER INTERACTIONS
     border_groups = defaultdict(list)
     for coord, data in interactions.items():
         if data.get("type") == "border" and "intensities" in data:
@@ -924,57 +936,83 @@ def compute_reallocation(interactions, protein_features):
             border_groups[key].append(coord)
 
     for (current, neighbors), coords in border_groups.items():
-        logging.debug(f"Processing border group: current={current} (type: {type(current)}), neighbors={neighbors}")
-        # Build the union of all marker sets across the coords in this group
+        # For each group, we also track sums to verify after distribution.
+        # `marker_total_taken` for all border coords in this group
+        # `marker_total_reallocated` for sum across all cells
+        marker_group_taken = defaultdict(float)
+        marker_group_reallocated = defaultdict(float)
+
+        # Build union of all markers
         marker_set = set()
         for coord in coords:
             marker_set.update(interactions[coord]["intensities"].keys())
 
         for marker in marker_set:
-            # Skip if marker name contains 'DNA' or 'Histone'
             if "DNA" in marker or "Histone" in marker:
                 continue
 
+            # Sum intensities for these coords
             total_intensity = 0.0
             for coord in coords:
-                intensity_val = interactions[coord]["intensities"].get(marker, 0)
-                total_intensity += intensity_val
+                total_intensity += interactions[coord]["intensities"].get(marker, 0)
 
-            # Tally up "taken_intensity" for the current cell
+            # Mark that the current cell "takes" it
             reallocation[current]["taken_intensity"][marker] += total_intensity
 
-            # Retrieve means, forcing scalars if needed.
-            current_mean = mean_intensities.get((current, marker), 0)
-            neighbor_means = []
-            for n in neighbors:
-                mval = mean_intensities.get((n, marker), 0)
-                neighbor_means.append(mval)
+            # Bookkeeping for checks
+            marker_group_taken[marker] += total_intensity
 
-            logging.debug(f"Marker: {marker} -- current_mean: {current_mean}, neighbor_means: {neighbor_means}")
+            # Distribute
+            current_mean = mean_intensities.get((current, marker), 0)
+            neighbor_means = [mean_intensities.get(n, 0)
+                              if isinstance(n, tuple) else mean_intensities.get((n, marker), 0)
+                              for n in neighbors]
+            # (Note: in case `neighbors` are ints, we do get((n, marker), 0).
+            #  If your code sometimes yields weird tuples, adapt accordingly.)
 
             total_mean = current_mean + sum(neighbor_means)
+
             if total_mean == 0:
                 # Fallback: reallocate all intensity to the current cell
                 reallocation[current]["reallocated_intensity"][marker] += total_intensity
+                # Also track reallocated sum (for checks)
+                marker_group_reallocated[marker] += total_intensity
             else:
+                # Collect cells with nonzero means
                 labels_nonzero = []
                 intensities_nonzero = []
                 if current_mean > 0:
                     labels_nonzero.append(current)
                     intensities_nonzero.append(current_mean)
-                for n, mval in zip(neighbors, neighbor_means):
+                for nb, mval in zip(neighbors, neighbor_means):
                     if mval > 0:
-                        labels_nonzero.append(n)
+                        labels_nonzero.append(nb)
                         intensities_nonzero.append(mval)
 
                 sum_nonzero = sum(intensities_nonzero)
-                for lab, mval in zip(labels_nonzero, intensities_nonzero):
-                    factor = mval / sum_nonzero
-                    reallocation[lab]["reallocated_intensity"][marker] += factor * total_intensity
+                if sum_nonzero == 0:
+                    # Should only happen if all means were <= 0
+                    reallocation[current]["reallocated_intensity"][marker] += total_intensity
+                    marker_group_reallocated[marker] += total_intensity
+                else:
+                    for lab, mval in zip(labels_nonzero, intensities_nonzero):
+                        factor = mval / sum_nonzero
+                        allocated = factor * total_intensity
+                        reallocation[lab]["reallocated_intensity"][marker] += allocated
+                        marker_group_reallocated[marker] += allocated
 
-    # ----------------------------------
-    # 2) GROUP & PROCESS BACKGROUND INTERACTIONS
-    # ----------------------------------
+        # Now check sums for all markers in this group
+        for marker in marker_group_taken.keys():
+            taken_val = marker_group_taken[marker]
+            reallocated_val = marker_group_reallocated[marker]
+            # Make sure we didn't create or destroy intensity
+            if not (abs(taken_val - reallocated_val) <= tol):
+                msg = (f"Border group mismatch for (cell={current}, neighbors={neighbors}), "
+                       f"marker={marker}. Taken={taken_val}, Reallocated={reallocated_val}.")
+                logging.error(msg)
+                # Optionally: raise ValueError(msg)
+
+    # 3) GROUP & PROCESS BACKGROUND INTERACTIONS
     background_groups = defaultdict(list)
     for coord, data in interactions.items():
         if data.get("type") == "background" and "intensities" in data:
@@ -982,6 +1020,11 @@ def compute_reallocation(interactions, protein_features):
             background_groups[key].append(coord)
 
     for cells, coords in background_groups.items():
+        # For background, it's normal that some portion may remain unclaimed
+        # (if no cell has a nonzero mean).
+        # So we only check that sum(allocated) <= total_intensity.
+        marker_allocated = defaultdict(float)
+
         marker_set = set()
         for coord in coords:
             marker_set.update(interactions[coord]["intensities"].keys())
@@ -999,88 +1042,86 @@ def compute_reallocation(interactions, protein_features):
                 cell_mean = mean_intensities.get((cell, marker), 0)
                 if cell_mean > 0:
                     reallocation[cell]["reallocated_intensity"][marker] += total_intensity
+                    marker_allocated[marker] += total_intensity
             else:
                 nonzero_labels = []
                 nonzero_means = []
-                for cell in cells:
-                    val = mean_intensities.get((cell, marker), 0)
+                for cell_id in cells:
+                    val = mean_intensities.get((cell_id, marker), 0)
                     if val > 0:
-                        nonzero_labels.append(cell)
+                        nonzero_labels.append(cell_id)
                         nonzero_means.append(val)
 
                 if nonzero_labels:
                     sum_nonzero = sum(nonzero_means)
-                    for lab, mval in zip(nonzero_labels, nonzero_means):
-                        factor = mval / sum_nonzero
-                        reallocation[lab]["reallocated_intensity"][marker] += factor * total_intensity
+                    if sum_nonzero == 0:
+                        # No actual claims
+                        # Then no intensity is allocated
+                        pass
+                    else:
+                        for lab, mval in zip(nonzero_labels, nonzero_means):
+                            factor = mval / sum_nonzero
+                            allocated_val = factor * total_intensity
+                            reallocation[lab]["reallocated_intensity"][marker] += allocated_val
+                            marker_allocated[marker] += allocated_val
 
+            # Safety check: ensure allocated <= total
+            if marker_allocated[marker] - total_intensity > tol:
+                msg = (f"Background over-allocation for marker={marker}, "
+                       f"allocated={marker_allocated[marker]:.6f} vs total={total_intensity:.6f}.")
+                logging.error(msg)
+                # Optionally: raise ValueError(msg)
+
+    logging.info("Finished reallocation with safety checks.")
     return dict(reallocation)
 
 
 @debug_log
-def settle_debts_intensity(fov_folder, reallocation, morph_features, protein_features,
-                           original_sum_dir, original_mean_dir, corrected_sum_dir, corrected_mean_dir):
+def settle_debts_intensity(fov_folder, reallocation, protein_features, original_sum_dir, unhuddle_sum_dir):
     """
-    Applies intensity adjustments from 'reallocation' to 'protein_features',
-    saves original and corrected sum/mean intensities, and returns `corrected_sum_df`.
+    Applies intensity reallocation to protein_features, and saves both original and corrected sum intensities.
 
-    The function:
-       1) Saves original sum/mean intensities before settlement.
-       2) Subtracts 'taken_intensity' from the original sum.
-       3) Adds 'reallocated_intensity' from redistribution.
-       4) Saves both original and corrected values in CSVs.
-       5) Returns the corrected sum DataFrame.
+    Args:
+        fov_folder (str): Path to the FOV folder (used to extract FOV name).
+        reallocation (dict): Dictionary of taken/reallocated intensities per label.
+        protein_features (pd.DataFrame): Indexed by (FOV, Label) with _Cell_Sum_Intensity columns.
+        original_sum_dir (str): Directory to save original sum CSV.
+        unhuddle_sum_dir (str): Directory to save corrected sum CSV.
 
-    Assumes:
-       - `protein_features` is indexed by (FOV, Label).
-       - `morph_features` contains "Label" and "Area".
-       - `reallocation` contains 'taken_intensity' and 'reallocated_intensity'.
+    Returns:
+        pd.DataFrame: Original sum intensities.
+        pd.DataFrame: Corrected sum intensities.
     """
+    import os
+    import pandas as pd
+
     fov_name = os.path.basename(fov_folder)
+    logging.info(f"[{fov_name}] Starting intensity settlement...")
 
-    # Ensure output directories exist.
-    for d in [original_sum_dir, original_mean_dir, corrected_sum_dir, corrected_mean_dir]:
-        os.makedirs(d, exist_ok=True)
+    os.makedirs(original_sum_dir, exist_ok=True)
+    os.makedirs(unhuddle_sum_dir, exist_ok=True)
 
-    # Ensure protein_features has a multi-index (FOV, Label)
+    # Ensure index is (FOV, Label)
     if not isinstance(protein_features.index, pd.MultiIndex) or protein_features.index.names != ["FOV", "Label"]:
-        logging.info(f"[{fov_name}] Resetting index on protein_features to (FOV, Label).")
+        logging.info(f"[{fov_name}] Setting protein_features index to (FOV, Label).")
         protein_features = protein_features.set_index(["FOV", "Label"])
 
-    # Verify required columns in morph_features.
-    if not {"Label", "Area"}.issubset(morph_features.columns):
-        logging.error(f"[{fov_name}] Morphology features missing required columns.")
+    # Identify markers
+    sum_cols = [col for col in protein_features.columns if col.endswith("_Cell_Sum_Intensity")]
+    marker_names = sorted([col.replace("_Cell_Sum_Intensity", "") for col in sum_cols])
+    if not marker_names:
+        logging.error(f"[{fov_name}] No valid _Cell_Sum_Intensity markers found.")
         return None
 
-    # Build area lookup (not used further in this simplified version).
-    area_lookup = dict(zip(morph_features["Label"], morph_features["Area"]))
-    if not area_lookup:
-        logging.error(f"[{fov_name}] Area lookup is empty.")
-        return None
-
-    logging.info(f"[{fov_name}] Starting intensity settlement.")
-
-    # Build mapping from full column names to markers.
-    original_sums = {col: col.replace("_Cell_Sum_Intensity", "")
-                     for col in protein_features.columns if col.endswith("_Cell_Sum_Intensity")}
-    original_means = {col: col.replace("_Cell_Mean_Intensity", "")
-                      for col in protein_features.columns if col.endswith("_Cell_Mean_Intensity")}
-    available_markers = sorted(set(original_sums.values()) & set(original_means.values()))
-    if not available_markers:
-        logging.error(f"[{fov_name}] No valid markers found in protein_features.")
-        return None
-
-    # Save original intensity CSVs.
+    # --- Save original sums before changes ---
     orig_sum_df = protein_features.reset_index().drop(columns=["FOV"], errors="ignore")[
-        ["Label"] + list(original_sums.keys())]
-    orig_mean_df = protein_features.reset_index().drop(columns=["FOV"], errors="ignore")[
-        ["Label"] + list(original_means.keys())]
-    orig_sum_df = orig_sum_df.rename(columns=original_sums)[['Label'] + available_markers]
-    orig_mean_df = orig_mean_df.rename(columns=original_means)[['Label'] + available_markers]
-    orig_sum_df.to_csv(os.path.join(original_sum_dir, f"{fov_name}.csv"), index=False)
-    orig_mean_df.to_csv(os.path.join(original_mean_dir, f"{fov_name}.csv"), index=False)
+        ["Label"] + sum_cols]
+    orig_sum_df = orig_sum_df.rename(columns={f"{m}_Cell_Sum_Intensity": m for m in marker_names})
+    orig_path = os.path.join(original_sum_dir, f"{fov_name}.csv")
+    orig_sum_df.to_csv(orig_path, index=False)
+    logging.info(f"[{fov_name}] Saved original sum intensities to {orig_path}")
 
-    # Apply reallocation adjustments.
+    # --- Apply reallocation ---
     for label, data in reallocation.items():
         parsed_label = int(label) if isinstance(label, str) and label.isdigit() else label
         key = (fov_name, parsed_label)
@@ -1088,118 +1129,146 @@ def settle_debts_intensity(fov_folder, reallocation, morph_features, protein_fea
             logging.warning(f"[{fov_name}] Skipping missing cell: {key}")
             continue
         for marker, taken_val in data.get("taken_intensity", {}).items():
-            sum_col = f"{marker}_Cell_Sum_Intensity"
-            if sum_col in protein_features.columns:
-                protein_features.at[key, sum_col] -= taken_val
+            col = f"{marker}_Cell_Sum_Intensity"
+            if col in protein_features.columns:
+                protein_features.at[key, col] -= taken_val
         for marker, realloc_val in data.get("reallocated_intensity", {}).items():
-            sum_col = f"{marker}_Cell_Sum_Intensity"
-            if sum_col in protein_features.columns:
-                protein_features.at[key, sum_col] += realloc_val
+            col = f"{marker}_Cell_Sum_Intensity"
+            if col in protein_features.columns:
+                protein_features.at[key, col] += realloc_val
 
-    # Build corrected intensity DataFrames.
+    # --- Save corrected sums ---
     corrected_sum_df = protein_features.reset_index().drop(columns=["FOV"], errors="ignore")[
-        ["Label"] + list(original_sums.keys())]
-    corr_mean_df = protein_features.reset_index().drop(columns=["FOV"], errors="ignore")[
-        ["Label"] + list(original_means.keys())]
-    corrected_sum_df = corrected_sum_df.rename(columns=original_sums)[['Label'] + available_markers]
-    corr_mean_df = corr_mean_df.rename(columns=original_means)[['Label'] + available_markers]
-    corrected_sum_df.to_csv(os.path.join(corrected_sum_dir, f"{fov_name}.csv"), index=False)
-    corr_mean_df.to_csv(os.path.join(corrected_mean_dir, f"{fov_name}.csv"), index=False)
+        ["Label"] + sum_cols]
+    corrected_sum_df = corrected_sum_df.rename(columns={f"{m}_Cell_Sum_Intensity": m for m in marker_names})
+    corr_path = os.path.join(unhuddle_sum_dir, f"{fov_name}.csv")
+    corrected_sum_df.to_csv(corr_path, index=False)
+    logging.info(f"[{fov_name}] Saved corrected sum intensities to {corr_path}")
 
-    logging.info(f"[{fov_name}] Intensity settlement completed.")
-    return corrected_sum_df
+    return orig_sum_df, corrected_sum_df
 
 
 # ---------------------- Stage 6: Normalized Intensity Calculation ---------------------- #
-
-@debug_log
-def compute_area_blowup(cell_mask):
-    labels = np.unique(cell_mask)
-    labels = labels[labels > 0]  # Exclude background (0)
-
-    if len(labels) == 0:
-        logging.warning("compute_area_blowup: No cell labels found in mask.")
-        return pd.DataFrame(columns=["Label", "Initial_Area", "Blowup_Area"])
-
-    blowup = []
-    for label in labels:
-        label_mask = (cell_mask == label)
-        initial_area = np.sum(label_mask)
-        blownup_mask = dilation(label_mask, disk(1))
-        blownup_area = np.sum(blownup_mask)
-
-        blowup.append({'Label': int(label),
-                       'Initial_Area': int(initial_area),
-                       'Blowup_Area': int(blownup_area)})
-
-    df = pd.DataFrame(blowup)
-    logging.debug(f"compute_area_blowup: Computed blowup areas for {len(df)} cells.")
-    return df
-
-@debug_log
-def compute_normalized_intensities_for_fov(fov_folder, cell_mask, corrected_sum_df, normalized_output_dir):
+def fully_weighted_normalize_and_scale(matrix, var_names, sensor_markers, max_n=4, min_relative_weight=0.01,
+                                       lower=0.1, upper=99.9):
     """
-    Computes normalized intensities from the corrected sum intensities DataFrame.
-    Normalized intensity = corrected_sum / blowup_area.
+    Performs per-cell normalization using top sensor markers (weighted), followed by robust per-marker scaling.
+
+    Parameters:
+        matrix (np.ndarray): Raw intensity matrix (cells x markers)
+        var_names (list): List of marker names (length = matrix.shape[1])
+        sensor_markers (list): Markers used for per-cell normalization
+        max_n (int): Max number of sensor markers to use per cell
+        min_relative_weight (float): Minimum contribution threshold for a marker to be used
+        lower (float): Lower percentile for robust scaling
+        upper (float): Upper percentile for robust scaling
+
+    Returns:
+        scaled_matrix (np.ndarray): Matrix after per-cell and per-marker normalization
+        marker_counts (np.ndarray): Number of sensor markers used per cell
+    """
+    marker_idx = [i for i, name in enumerate(var_names) if name in sensor_markers]
+    norm_matrix = np.zeros_like(matrix)
+    marker_counts = np.zeros(matrix.shape[0], dtype=int)
+
+    # --- Per-cell normalization using sensor markers ---
+    for i in range(matrix.shape[0]):
+        cell_values = matrix[i, marker_idx]
+        sorted_idx = np.argsort(cell_values)[::-1]
+        sorted_values = cell_values[sorted_idx]
+
+        top_value = sorted_values[0] if len(sorted_values) > 0 else 0
+        if top_value <= 0:
+            continue
+
+        relative_values = sorted_values / top_value
+        weights_mask = relative_values >= min_relative_weight
+        selected_raw_values = sorted_values[weights_mask][:max_n]
+        selected_relative_values = relative_values[weights_mask][:max_n]
+
+        marker_counts[i] = len(selected_raw_values)
+
+        if len(selected_raw_values) > 0:
+            weights = selected_relative_values
+            scale = np.average(selected_raw_values, weights=weights)
+            if scale > 0:
+                norm_matrix[i, :] = matrix[i, :] / scale
+
+    # --- Per-marker robust scaling ---
+    scaled_matrix = np.zeros_like(norm_matrix)
+    for j in range(norm_matrix.shape[1]):
+        col = norm_matrix[:, j]
+        nonzero_mask = col != 0
+        nonzero_vals = col[nonzero_mask]
+
+        if len(nonzero_vals) > 0:
+            p1, p99 = np.percentile(nonzero_vals, [lower, upper])
+            if p99 != p1:
+                scaled_col = (col - p1) / (p99 - p1)
+                scaled_col = np.clip(scaled_col, 0, 1)
+                scaled_col[~nonzero_mask] = 0
+                scaled_matrix[:, j] = scaled_col
+            else:
+                scaled_matrix[:, j] = 0.5  # fallback for flat marker
+        else:
+            scaled_matrix[:, j] = 0
+
+    return scaled_matrix, marker_counts
+
+@debug_log
+def compute_normalized_intensities_for_fov(fov_folder, corrected_sum_df, sensor_markers):
+    """
+    Computes per-cell and per-marker normalized intensities using sensor markers.
 
     Args:
-        fov_folder (str): Path to the FOV folder.
-        cell_mask (np.array): Cell mask for this FOV.
-        corrected_sum_df (pd.DataFrame): Final sum intensity DataFrame (from settle_debts_intensity).
-        normalized_output_dir (str): Output directory for normalized intensities.
+        fov_folder (str): Path to the FOV folder (used for naming only).
+        corrected_sum_df (pd.DataFrame): DataFrame with 'Label' and marker columns.
+        sensor_markers (list): List of markers used for per-cell normalization.
+
+    Returns:
+        fov_name (str): Extracted FOV name
+        normalized_df (pd.DataFrame): DataFrame with 'Label', scaled marker values
     """
+    import numpy as np
+    import pandas as pd
+    import os
+
     fov_name = os.path.basename(fov_folder)
-    logging.info(f"Computing normalized intensities for {fov_name}.")
-
-    # Compute blowup areas
-    area_df = compute_area_blowup(cell_mask)
-    if area_df is None or area_df.empty:
-        logging.error(f"Skipping {fov_name} due to missing or empty mask.")
-        return
-
-    # Ensure 'Label' is integer for merging
-    area_df["Label"] = area_df["Label"].astype(int)
+    logging.info(f"Normalizing intensities for {fov_name}")
 
     if "Label" not in corrected_sum_df.columns:
-        logging.error(f"Skipping {fov_name}: 'Label' column missing in corrected sum intensities.")
-        return
+        logging.error(f"{fov_name} is missing required 'Label' column.")
+        return fov_name, None
 
-    corrected_sum_df["Label"] = corrected_sum_df["Label"].astype(int)
+    # Extract marker columns
+    marker_columns = sorted([col for col in corrected_sum_df.columns if col != 'Label'])
+    raw_matrix = corrected_sum_df[marker_columns].values
+    logging.debug(f"Using marker columns: {marker_columns}")
 
-    # Merge corrected sum intensities with the area DataFrame
-    merged_df = corrected_sum_df.merge(area_df, on="Label", how="left")
-    logging.debug(f"Merged corrected sum intensities with area data. Merged DataFrame columns: {list(merged_df.columns)}")
+    # Normalize and scale
+    scaled_matrix, marker_counts = fully_weighted_normalize_and_scale(
+        matrix=raw_matrix,
+        var_names=marker_columns,
+        sensor_markers=sensor_markers,
+        max_n=4,
+        min_relative_weight=0.01,
+        lower=0.1,
+        upper=99.9
+    )
 
-    # Ensure 'Blowup_Area' is numeric
-    merged_df["Blowup_Area"] = pd.to_numeric(merged_df["Blowup_Area"], errors="coerce")
+    # Construct output DataFrame
+    normalized_df = pd.DataFrame(scaled_matrix, columns=marker_columns)
+    normalized_df.insert(0, 'Label', corrected_sum_df["Label"].values)
 
-    # Get marker intensity columns, explicitly excluding 'Label', 'Blowup_Area', and 'Initial_Area'
-    marker_columns = sorted([col for col in merged_df.columns if col not in ['Label', 'Blowup_Area', 'Initial_Area']])
-    logging.debug(f"Marker intensity columns used for normalization: {marker_columns}")
-
-    # Normalize intensities: corrected_sum / blowup_area
-    normalized_df = merged_df[['Label']].copy()
-    for marker in marker_columns:
-        merged_df[marker] = pd.to_numeric(merged_df[marker], errors="coerce")
-        normalized_df[marker] = merged_df[marker] / merged_df["Blowup_Area"].replace(0, np.nan)
-        logging.debug(f"Normalized marker '{marker}': first few values {normalized_df[marker].head().tolist()}")
-
-    # Ensure marker columns are sorted alphabetically
-    normalized_df = normalized_df[['Label'] + marker_columns]
-
-    # Save to CSV
-    os.makedirs(normalized_output_dir, exist_ok=True)
-    out_csv = os.path.join(normalized_output_dir, f"{fov_name}.csv")
-    normalized_df.to_csv(out_csv, index=False)
-    logging.info(f"Saved normalized intensities for {fov_name} to {out_csv}")
+    return fov_name, normalized_df
 
 
 # ---------------------- Combined FOV Pipeline ---------------------- #
 @debug_log
 def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
-                         normalized_output_dir, original_sum_dir, original_mean_dir,
-                         corrected_sum_dir, corrected_mean_dir, create_nuclear_mask,
-                         create_deepcell_mask, geckodriver_path, deepcell_url, mask_pattern):
+                         original_sum_dir, original_norm_dir,
+                         unhuddle_sum_dir, unhuddle_norm_dir, create_nuclear_mask,
+                         create_deepcell_mask, geckodriver_path, deepcell_url, mask_pattern, markers_for_normalisation):
     result = {"fov": fov_path}
     try:
         if create_deepcell_mask:
@@ -1223,18 +1292,24 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
             nuclear_mask = None
             logger.info("Skipping nuclear mask creation as per flag.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred during mask creation for {fov_path}: {e}")
-        cell_mask, nuclear_mask = None, None
+        logger.error(f"An unexpected error occurred during mask creation for {fov_path}: {e}, skipping this FOV")
+        print(f"\n[!] Skipped FOV: {fov_path} often due to artefactual image, failing deepcell QC.\n"
+              f"    ➤ TIP: You can add a custom mask file '*_0.tiff' and run the code again with the --fovs flag.\n"
+              f"    ➤ You can override the mask pattern using --mask-pattern if needed.\n")
+        result["critical_error"] = f"Mask creation failed: {e}"
+        return result  # Stop further processing, all downstream steps depend on this
 
     try:
         morph_features = extract_morphology_features(fov_path, morph_features_dir, cell_mask, nuclear_mask)
     except Exception as e:
         logger.error(f"Error extracting features for {fov_path}: {e}")
+        result["feature_extraction_error"] = str(e)
 
     try:
         membrane_mask, memexcl_mask = process_membrane_masks(fov_path, cell_mask)
     except Exception as e:
         logger.error(f"Error creating membrane-related masks for {fov_path}: {e}")
+        result["membrane_mask_error"] = str(e)
 
     try:
         protein_features = extract_protein_intensity(fov_path, protein_features_dir,
@@ -1249,27 +1324,51 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
         background_int, _ = compute_background_interactions(cell_mask)
         merged = merge_interactions(border_int, background_int)
         all_interactions = integrate_intensities_for_interactions(fov_path, merged)
-        reallocation = compute_reallocation(all_interactions, protein_features)
+        reallocation = compute_reallocation_with_checks(all_interactions, protein_features, 1e-6)
     except Exception as e:
         logger.error(f"Error in object intensity analysis for {fov_path}: {e}")
         result["object_intensity_error"] = str(e)
 
     try:
-        corrected_sum_df = settle_debts_intensity(fov_path, reallocation, morph_features, protein_features,
-                                                    original_sum_dir, original_mean_dir, corrected_sum_dir, corrected_mean_dir)
+        original_sum_df, corrected_sum_df = settle_debts_intensity(fov_path, reallocation, protein_features,
+                                                                   original_sum_dir, unhuddle_sum_dir)
         result["intensity_settled"] = True
     except Exception as e:
         logger.error(f"Error settling intensities for {fov_path}: {e}")
         result["intensity_settlement_error"] = str(e)
 
     try:
-        compute_normalized_intensities_for_fov(fov_path, cell_mask, corrected_sum_df, normalized_output_dir)
-        result["normalized_intensity"] = True
+        fov_name, norm_corrected = compute_normalized_intensities_for_fov(
+            fov_folder=fov_path,
+            corrected_sum_df=corrected_sum_df,
+            sensor_markers=markers_for_normalisation
+        )
+
+        if norm_corrected is not None:
+            output_file = os.path.join(unhuddle_norm_dir, f"{fov_name}.csv")
+            norm_corrected.to_csv(output_file, index=False)
+            logger.info(f"Saved normalized intensities for {fov_name} to {output_file}")
+            result["normalized_intensity"] = True
+        else:
+            raise ValueError("Normalization returned None")
+        _, norm_original = compute_normalized_intensities_for_fov(
+            fov_folder=fov_path,
+            corrected_sum_df=original_sum_df,
+            sensor_markers=markers_for_normalisation
+        )
+
+        if norm_original is not None:
+            output_file = os.path.join(original_norm_dir, f"{fov_name}.csv")
+            norm_original.to_csv(output_file, index=False)
+            logger.info(f"Saved normalized original intensities for {fov_name} to {output_file}")
+            result["normalized_original_intensity"] = True
+        else:
+            raise ValueError("Normalization returned None")
     except Exception as e:
         logger.error(f"Error computing normalized intensities for {fov_path}: {e}")
         result["normalized_intensity_error"] = str(e)
+        return result
 
-    return result
 
 # ----- Main Entry Point ----- #
 def main():
@@ -1278,14 +1377,14 @@ def main():
     )
     parser.add_argument("--base_path", type=str, required=True, help="Base path containing FOV folders")
     parser.add_argument("--output_base_path", type=str, required=True, help="Base path for output")
-    parser.add_argument("--max_workers", type=int, default=32, help="Number of parallel workers (default: 32)")
+    parser.add_argument("--max_workers", type=int, default=1, help="Number of parallel workers (default: 1)")
     parser.add_argument("--create_nuclear_mask", action="store_true", default=False,
-                        help="Flag to create the nuclear mask")
+                        help="Flag to create the nuclear mask, will ensure morphology features and N/C ratio")
     parser.add_argument("--create_deepcell_mask", action="store_true", default=False,
                         help="Flag to create and process the DeepCell overlay mask")
     parser.add_argument("--geckodriver_path", type=str,
                         default="/drive3/tnoorden/tools/geckodriver-v0.35.0-linux64/geckodriver",
-                        help="Path to the geckodriver executable.")
+                        help="Path to the geckodriver executable")
     parser.add_argument("--deepcell_url", type=str,
                         default="http://www.deepcell.org",
                         help="URL for the DeepCell website.")
@@ -1293,28 +1392,67 @@ def main():
                         help="List of FOV folder names to process. If not specified, all FOV folders in base_path will be processed.")
     parser.add_argument("--mask_pattern", type=str, nargs='+', default=["*_0.tiff"],
                         help="Wildcard pattern(s) for the mask file (default: '*_0.tiff').")
-    # New flag to check if output exists
+    parser.add_argument("--list_available_markers", action="store_true",
+                        help="Print list of available markers and exit.")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="If set, the script will check if output already exists in normalized_output_dir and skip that FOV.")
+    parser.add_argument("--markers_for_normalisation", nargs="*", default=None,
+                        help="List of markers to use for normalization (e.g. CD45 CD3 Vimentin). Required unless --list_available_markers is used.")
+
     args = parser.parse_args()
+    # Conditional requirement for markers
+    if not args.list_available_markers and not args.markers_for_normalisation:
+        parser.error("--markers_for_normalisation is required unless --list_available_markers is set.")
+
+    if args.list_available_markers:
+        import glob
+        import sys
+
+        # Find FOV folders
+        fov_folders = [
+            os.path.join(args.base_path, fov)
+            for fov in os.listdir(args.base_path)
+            if os.path.isdir(os.path.join(args.base_path, fov))
+        ]
+
+        if not fov_folders:
+            print("No FOV folders found under base_path. Cannot list markers.")
+            sys.exit(1)
+
+        # Use first FOV
+        first_fov_path = fov_folders[0]
+        fov_name = os.path.basename(first_fov_path)
+
+        # Find *.ome.tiff files
+        ome_tiffs = sorted(glob.glob(os.path.join(first_fov_path, "*.ome.tiff")))
+        if not ome_tiffs:
+            print(f"No .ome.tiff files found in {first_fov_path}. Cannot list markers.")
+            sys.exit(1)
+
+        # Extract marker names
+        markers = sorted([
+            os.path.basename(path).replace(".ome.tiff", "")
+            for path in ome_tiffs
+        ])
+
+        print(f"\nAvailable markers in FOV '{fov_name}':\n")
+        for m in markers:
+            print(f"  {m}")
+        print(f"\nTotal: {len(markers)} marker files found.")
+        sys.exit(0)
 
     output_base_path = args.output_base_path
     morph_features_dir = os.path.join(output_base_path, "morphology_features")
     protein_features_dir = os.path.join(output_base_path, "protein_features")
     original_sum_dir = os.path.join(output_base_path, "original_sum")
-    original_mean_dir = os.path.join(output_base_path, "original_mean")
-    corrected_sum_dir = os.path.join(output_base_path, "corrected_sum")
-    corrected_mean_dir = os.path.join(output_base_path, "corrected_mean")
-    normalized_output_dir = os.path.join(output_base_path, "unhuddle_normalized")
+    original_norm_dir = os.path.join(output_base_path, "original_normalized")
+    unhuddle_sum_dir = os.path.join(output_base_path, "unhuddle_sum")
+    unhuddle_norm_dir = os.path.join(output_base_path, "unhuddle_normalized")
 
     # Create all required directories
     for d in [output_base_path, morph_features_dir, protein_features_dir, original_sum_dir,
-              original_mean_dir, corrected_sum_dir, corrected_mean_dir, normalized_output_dir]:
+              original_norm_dir, unhuddle_sum_dir, unhuddle_norm_dir]:
         os.makedirs(d, exist_ok=True)
-
-    MEASURE_TYPES = ["type1", "type2"]
-    for mtype in MEASURE_TYPES:
-        os.makedirs(os.path.join(output_base_path, mtype), exist_ok=True)
 
     # Gather FOV folders from the base path.
     all_fov_folders = [
@@ -1334,8 +1472,8 @@ def main():
         filtered_fov_folders = []
         for fov in fov_folders:
             fov_basename = os.path.basename(fov)
-            # Look for any file starting with the fov_basename in normalized_output_dir.
-            pattern = os.path.join(normalized_output_dir, f"{fov_basename}*")
+            # Look for any file starting with the fov_basename in unhuddle_norm_dir.
+            pattern = os.path.join(unhuddle_norm_dir, f"{fov_basename}*")
             matching_outputs = glob.glob(pattern)
             if matching_outputs:
                 logger.info(f"Skipping FOV '{fov}' as output already exists: {matching_outputs}")
@@ -1355,16 +1493,16 @@ def main():
                 fov,
                 morph_features_dir,
                 protein_features_dir,
-                normalized_output_dir,
                 original_sum_dir,
-                original_mean_dir,
-                corrected_sum_dir,
-                corrected_mean_dir,
+                original_norm_dir,
+                unhuddle_sum_dir,
+                unhuddle_norm_dir,
                 args.create_nuclear_mask,
                 args.create_deepcell_mask,
                 args.geckodriver_path,
                 args.deepcell_url,
-                args.mask_pattern
+                args.mask_pattern,
+                args.markers_for_normalisation
             ): fov for fov in fov_folders
         }
         for future in tqdm(as_completed(future_to_fov), total=len(fov_folders), desc="Processing FOVs"):
@@ -1375,6 +1513,31 @@ def main():
             except Exception as e:
                 logger.error(f"Error processing FOV {fov}: {e}")
                 results[fov] = {"fov": fov, "error": str(e)}
+            # ----- Summarize FOVs with Errors -----
+    errored_fovs = []
+
+    for fov, result in results.items():
+        if result is None:
+            errored_fovs.append(fov)
+            continue
+
+        if any(
+            isinstance(v, str) and ('error' in k.lower() or 'error' in v.lower())
+            for k, v in result.items()
+        ):
+            errored_fovs.append(fov)
+
+
+    if errored_fovs:
+        print("\n⚠️ FOVs with errors during processing:")
+        for fov in errored_fovs:
+            print(f"- {fov}")
+    else:
+        print("\n✅ All FOVs processed successfully.")
+    
+    return errored_fovs
+	
+
 
 if __name__ == "__main__":
     main()
