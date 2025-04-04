@@ -64,8 +64,7 @@ from tifffile import imread
 from tqdm import tqdm
 
 # ---------------------- Logging & Shutdown ---------------------- #
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
+
 
 
 def shutdown_handler(signum, frame):
@@ -121,9 +120,8 @@ from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 
 # ----- Helper Function: Create DeepCell Overlay ----- #
 def create_deepcell_mask_overlay(fov_path,
-                                 red_markers=["DNA1", "DNA2", "HistoneH3"],
-                                 green_markers=["CD7", "CD3", "CD15", "CD11c", "CD68", "CD45RO", "CD45RA", "CD20",
-                                                "Vimentin"],
+                                 red_markers,
+                                 green_markers,
                                  blue_markers=None):
     """
     Create a DeepCell overlay mask from single-slice TIFFs in fov_path.
@@ -1265,11 +1263,17 @@ def compute_normalized_intensities_for_fov(fov_folder, corrected_sum_df, sensor_
 def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
                          original_sum_dir, original_norm_dir,
                          unhuddle_sum_dir, unhuddle_norm_dir, create_nuclear_mask,
-                         create_deepcell_mask, geckodriver_path, deepcell_url, mask_pattern, markers_for_normalisation):
+                         create_deepcell_mask, geckodriver_path, deepcell_url, mask_pattern, markers_for_normalisation, red_markers, green_markers, blue_markers):
     result = {"fov": fov_path}
     try:
         if create_deepcell_mask:
-            overlay_file = create_deepcell_mask_overlay(fov_path)
+            overlay_file = create_deepcell_mask_overlay(
+                fov_path,
+                red_markers=red_markers,
+                green_markers=green_markers,
+                blue_markers=blue_markers
+            )
+
             result["deepcell_overlay_file"] = overlay_file
             if overlay_file:
                 try:
@@ -1379,6 +1383,21 @@ def main():
                         help="Flag to create the nuclear mask, will ensure morphology features and N/C ratio")
     parser.add_argument("--create_deepcell_mask", action="store_true", default=False,
                         help="Flag to create and process the DeepCell overlay mask")
+    parser.add_argument(
+    "--red-markers", nargs="+",
+    default=["DNA1", "DNA2", "HistoneH3"],
+    help="List of red channel markers (nuclear)"
+    )
+    parser.add_argument(
+    "--green-markers", nargs="+",
+    default=["CD7", "CD3", "CD15", "CD11c", "CD68", "CD45RO", "CD45RA", "CD20", "Vimentin"],
+    help="List of green channel markers (membrane/cytoplasm)"
+    )
+    parser.add_argument(
+    "--blue-markers", nargs="+",
+    default=[],
+    help="List of blue channel markers (optional, will currently be ignored for mask creation)"
+    )
     parser.add_argument("--geckodriver_path", type=str,
                         default="/drive3/tnoorden/tools/geckodriver-v0.35.0-linux64/geckodriver",
                         help="Path to the geckodriver executable")
@@ -1506,7 +1525,10 @@ def main():
                 args.geckodriver_path,
                 args.deepcell_url,
                 args.mask_pattern,
-                args.markers_for_normalisation
+                args.markers_for_normalisation,
+                args.red-markers,
+                args.green-markers,
+                args.blue-markers
             ): fov for fov in fov_folders
         }
         for future in tqdm(as_completed(future_to_fov), total=len(fov_folders), desc="Processing FOVs"):
