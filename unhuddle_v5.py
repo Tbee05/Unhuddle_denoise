@@ -64,7 +64,11 @@ from tifffile import imread
 from tqdm import tqdm
 
 # ---------------------- Logging & Shutdown ---------------------- #
+logger = logging.getLogger(__name__) 
 
+def setup_logging(log_level):
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    logging.basicConfig(level=level, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
 def shutdown_handler(signum, frame):
@@ -1410,7 +1414,7 @@ def main():
                         help="Wildcard pattern(s) for the mask file (default: '*_0.tiff').")
     parser.add_argument("--list_available_markers", action="store_true",
                         help="Print list of available markers and exit.")
-    pparser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="If set, the script will check if output already exists in normalized_output_dir and skip that FOV.")
     parser.add_argument("--markers_for_normalisation", nargs="*", default=None,
@@ -1457,11 +1461,10 @@ def main():
             print(f"  {m}")
         print(f"\nTotal: {len(markers)} marker files found.")
         sys.exit(0)
-    import logging
-
-    log_level = getattr(logging, args.log_level)
-    logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
-    logger = logging.getLogger(__name__)
+    
+    #set logger granularity based on flag 
+    setup_logging(args.log_level)
+    logger.info("Starting pipeline...")
 
     output_base_path = args.output_base_path
     morph_features_dir = os.path.join(output_base_path, "morphology_features")
@@ -1526,9 +1529,9 @@ def main():
                 args.deepcell_url,
                 args.mask_pattern,
                 args.markers_for_normalisation,
-                args.red-markers,
-                args.green-markers,
-                args.blue-markers
+                args.red_markers,
+                args.green_markers,
+                args.blue_markers
             ): fov for fov in fov_folders
         }
         for future in tqdm(as_completed(future_to_fov), total=len(fov_folders), desc="Processing FOVs"):
