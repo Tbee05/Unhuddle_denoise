@@ -63,11 +63,8 @@ from scipy import ndimage
 from tifffile import imread
 from tqdm import tqdm
 
-# Create subfolders for measure types.
-MEASURE_TYPES = ["corrected_mean", "corrected_sum", "original_mean", "original_sum"]
-
 # ---------------------- Logging & Shutdown ---------------------- #
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -191,7 +188,7 @@ def create_deepcell_mask_overlay(fov_path,
         elif blue_markers and marker in blue_markers:
             blue_channel += marker_img
         else:
-            logger.info(f"Marker '{marker}' not assigned to any channel. Skipping.")
+            logger.debug(f"Marker '{marker}' not assigned to any channel for overlay. Skipping.")
 
     if red_channel is None or green_channel is None:
         logger.warning(f"Required markers for red and green channels not found in {fov_path}.")
@@ -1294,7 +1291,7 @@ def process_fov_pipeline(fov_path, morph_features_dir, protein_features_dir,
     except Exception as e:
         logger.error(f"An unexpected error occurred during mask creation for {fov_path}: {e}, skipping this FOV")
         print(f"\n[!] Skipped FOV: {fov_path} often due to artefactual image, failing deepcell QC.\n"
-              f"    ➤ TIP: You can add a custom mask file '*_0.tiff' and run the code again with the --fovs flag.\n"
+              f"    ➤ TIP: You can 1. retry with 1 worker or 2. add a custom mask file '*_0.tiff' and run the code again with the --fovs flag.\n"
               f"    ➤ You can override the mask pattern using --mask-pattern if needed.\n")
         result["critical_error"] = f"Mask creation failed: {e}"
         return result  # Stop further processing, all downstream steps depend on this
@@ -1394,6 +1391,7 @@ def main():
                         help="Wildcard pattern(s) for the mask file (default: '*_0.tiff').")
     parser.add_argument("--list_available_markers", action="store_true",
                         help="Print list of available markers and exit.")
+    pparser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="If set, the script will check if output already exists in normalized_output_dir and skip that FOV.")
     parser.add_argument("--markers_for_normalisation", nargs="*", default=None,
@@ -1440,6 +1438,11 @@ def main():
             print(f"  {m}")
         print(f"\nTotal: {len(markers)} marker files found.")
         sys.exit(0)
+    import logging
+
+    log_level = getattr(logging, args.log_level)
+    logging.basicConfig(level=log_level, format="%(asctime)s [%(levelname)s] %(message)s")
+    logger = logging.getLogger(__name__)
 
     output_base_path = args.output_base_path
     morph_features_dir = os.path.join(output_base_path, "morphology_features")
@@ -1469,6 +1472,7 @@ def main():
 
     # If the check_output_exist flag is set, filter out FOVs that already have output.
     if args.check_output_exist:
+        import glob
         filtered_fov_folders = []
         for fov in fov_folders:
             fov_basename = os.path.basename(fov)
@@ -1521,12 +1525,12 @@ def main():
             errored_fovs.append(fov)
             continue
 
-        if any(
-            isinstance(v, str) and ('error' in k.lower() or 'error' in v.lower())
-            for k, v in result.items()
+        # FOV failed if it had a critical error or never reached normalization
+        if (
+            "critical_error" in result
+            or result.get("normalized_intensity") is not True
         ):
             errored_fovs.append(fov)
-
 
     if errored_fovs:
         print("\n⚠️ FOVs with errors during processing:")
@@ -1534,8 +1538,7 @@ def main():
             print(f"- {fov}")
     else:
         print("\n✅ All FOVs processed successfully.")
-    
-    return errored_fovs
+
 	
 
 
