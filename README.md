@@ -104,21 +104,21 @@ Argument	Description
 --markers_for_normalisation	REQUIRED unless using --list_available_markers
 ```
 
-##📎 Notes
+## 📎 Notes
 Requires Python 3.8+
 
 Dependencies: numpy, pandas, scikit-image, Selenium, and DeepCell-compatible image stack.
 
 Segmentation masks should ideally match the {fov}_{label} convention if supplied.
 
-##📊 Coming Soon
+## 📊 Coming Soon
 Visualization of sensor marker coverage and normalization effects
 
 Graphical breakdown of reallocation logic
 
 Support for additional normalization schemes (e.g. quantile)
 
-##📣 Citation & License
+## 📣 Citation & License
 This tool is part of an ongoing research pipeline for high-dimensional tissue profiling.
 Please cite appropriately once a manuscript is available. Open-source license to be defined.
 
