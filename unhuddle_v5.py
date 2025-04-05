@@ -6,8 +6,7 @@ Final Integrated Pipeline Documentation
 Overview:
 ---------
 This pipeline processes multiplexed imaging data across multiple Fields of View (FOVs),
-extracts morphological and protein expression features, and computes spatial interaction
-metrics at the single-cell level.
+extracts morphological and protein expression features, performs borderpixel deconvolution and normalizes the functional markerintensity to the phenotype carrying markerintensity.
 
 Input Requirements:
 -------------------
@@ -84,7 +83,7 @@ Pipeline Stages:
 
 4. **Object-Intensity Analysis**
    - Reorganize coordinate-level interaction data into a per-object (cell-level) structure.
-   - Reallocate intensities based on each object's mean intensity profile.
+   - Reallocate intensities based on each object's mean intensity profile as measured in 1pxl eroded mask.
 
 5. **Intensity Settlement**
    - Load the morphological and protein intensity CSVs.
