@@ -1,13 +1,44 @@
 
-### UNHUDDLE
+## UNHUDDLE
 **Uncovering Neighborhood Heterogeneity Using Deterministic Normalization and Local Equilibrium**
 
 UNHUDDLE is an algorithm designed to resolve multiplexed signal in densely packed tissue regions — or "cell huddles" — in multiplex spatial proteomics, where traditional segmentation and quantification blur the phenotypic signal.
 
 By identifying stable, broadly expressed "sensor markers" and performing per-cell normalization, UNHUDDLE enables accurate within-cell-type comparison of functional markers (e.g., checkpoint proteins), even in spatially crowded microenvironments.
 
+## 🚀 Getting Started with UNHUDDLE
 
-## 🗂️ Input Requirements
+### 📥 1. Clone the Repository
+
+```bash
+git clone https://github.com/tbee05/unhuddle.git
+cd unhuddle
+```
+
+### 📦 2. Set Up a Virtual Environment
+Using venv:
+```bash
+python -m venv unhuddle
+source unhuddle/bin/activate      # On Windows: unhuddle\Scripts\activate
+```
+or conda:
+```bash
+conda create -n unhuddle python=3.10 -y
+conda activate unhuddle
+```
+### 🛠️ 3. Install UNHUDDLE in Editable Mode
+```bash
+pip install -e .
+```
+This installs unhuddle as a CLI tool available from anywhere in your terminal.
+
+### ✅ 4. Verify Installation
+```bash
+unhuddle --help
+```
+Should print a list of CLI arguments and options.
+
+### 🗂️ 5. Check Input Requirements
 
 The base input directory should contain one folder per FOV:
 
@@ -27,7 +58,20 @@ Each FOV folder should contain:
 - Optionally: a segmentation mask (`*_mask_0.tiff`, shape:   `H x W` or `Z x H x W`, dtype: `uint16`)  
   If a mask is not provided, one can be generated using `--create_deepcell_mask`.
 
----
+
+### 🧪 6. Run the Pipeline
+```bash
+unhuddle \
+  --base_path /path/to/input_fovs \
+  --output_base_path /path/to/output_folder \
+  --markers_for_normalisation CD45 CD3 Vimentin \
+  --create_nuclear_mask \
+  --create_deepcell_mask \
+  --max_workers 1
+```
+
+
+
 
 ## ⚙️ Pipeline Overview
 
@@ -105,18 +149,61 @@ Argument	Description
 ```
 
 ## 📎 Notes
-Requires Python 3.8+
+✅ Python Compatibility:
+Requires Python 3.8 or higher
 
-Dependencies: numpy, pandas, scikit-image, Selenium, and DeepCell-compatible image stack.
+🧰 Core Dependencies:
 
-Segmentation masks should ideally match the {fov}_{label} convention if supplied.
+numpy, pandas — numerical and tabular processing
+
+scikit-image, scipy, tifffile — image and mask operations
+
+selenium, requests — automation for DeepCell.org
+
+tqdm — progress bar visualization
+
+🧠 Image Input Expectations:
+
+Marker files should follow the pattern: {marker}.ome.tiff
+
+Data shape: H x W (2D)
+
+Data type: float32 or float64 (from denoising like PENGUIN)
+
+🧩 Segmentation Mask Guidelines:
+
+Auto-detected via --mask_pattern (default: *_0.tiff)
+
+Must be 2D (H x W) or stack format (Z x H x W, Z is squeezed)
+
+If no mask is provided, DeepCell can generate one using --create_deepcell_mask
+
+🔖 Label Convention:
+
+Each cell should have a unique integer label
+
+These labels form the link between segmentation, intensity, and feature CSVs
+
+Optional: match {fov}_{label} for external compatibility
+
+🚀 Parallel Processing:
+
+Use --max_workers to process multiple FOVs concurrently
+
+--check_output_exist skips already-processed FOVs
+
+💡 Sensor Markers:
+
+Markers like CD3, CD45, Vimentin used for intra-cell normalization
+
+Must be broadly expressed and phenotype-informative
+
+Crucial for deconvolution of functional marker signal
 
 ## 📊 Coming Soon
-Visualization of sensor marker coverage and normalization effects
-
 Graphical breakdown of reallocation logic
-
 Support for additional normalization schemes (e.g. quantile)
+UNHUDDLE will be installable via `pip install unhuddle`
 
 ## 📣 Citation & License
 This tool is part of an ongoing research pipeline for high-dimensional tissue profiling.
