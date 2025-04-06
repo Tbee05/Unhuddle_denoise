@@ -1,0 +1,4 @@
+# PyCharm & Python metadata
+.idea/
+__pycache__/
+*.egg-info/
