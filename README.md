@@ -23,7 +23,7 @@ source unhuddle/bin/activate      # On Windows: unhuddle\Scripts\activate
 ```
 or conda:
 ```bash
-conda create -n unhuddle python=3.10 -y
+conda create -n unhuddle -y
 conda activate unhuddle
 ```
 ### 🛠️ 3. Install UNHUDDLE in Editable Mode
