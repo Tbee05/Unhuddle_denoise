@@ -2,7 +2,7 @@
 ### UNHUDDLE
 **Uncovering Neighborhood Heterogeneity Using Deterministic Normalization and Local Equilibrium**
 
-UNHUDDLE is an algorithm designed to resolve multiplexed signal in densely packed tissue regions — or "cell huddles" — where traditional segmentation and quantification blur the phenotypic signal.
+UNHUDDLE is an algorithm designed to resolve multiplexed signal in densely packed tissue regions — or "cell huddles" — in multiplex spatial proteomics, where traditional segmentation and quantification blur the phenotypic signal.
 
 By identifying stable, broadly expressed "sensor markers" and performing per-cell normalization, UNHUDDLE enables accurate within-cell-type comparison of functional markers (e.g., checkpoint proteins), even in spatially crowded microenvironments.
 
@@ -31,7 +31,7 @@ Each FOV folder should contain:
 
 ## ⚙️ Pipeline Overview
 
-For each FOV folder, the following stages are run:
+For each FOV (field of view) folder, the following stages are run:
 
 ### 1. **Mask Processing & Interaction Computation**
 - Segment cells, nuclei, and membranes.
