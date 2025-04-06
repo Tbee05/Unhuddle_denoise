@@ -1,4 +1,7 @@
 # src/unhuddle/normalization.py
+import numpy as np
+import pandas as pd
+import logging
 
 def fully_weighted_normalize_and_scale(matrix, var_names, sensor_markers, max_n=4, min_relative_weight=0.01,
                                        lower=0.1, upper=99.9):
