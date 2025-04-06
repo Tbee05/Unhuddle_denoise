@@ -9,12 +9,16 @@ By identifying stable, broadly expressed "sensor markers" and performing per-cel
 ## 🚀 Getting Started with UNHUDDLE
 
 ### 📥 1. Clone the Repository
-
+via https
 ```bash
 git clone https://github.com/tbee05/unhuddle.git
 cd unhuddle
 ```
-
+via ssh
+```bash
+git clone git@github.com:tbee05/unhuddle.git
+cd unhuddle
+```
 ### 📦 2. Set Up a Virtual Environment
 Using venv:
 ```bash
@@ -25,6 +29,7 @@ or conda:
 ```bash
 conda create -n unhuddle -y
 conda activate unhuddle
+conda install pip
 ```
 ### 🛠️ 3. Install UNHUDDLE in Editable Mode
 ```bash
@@ -203,6 +208,7 @@ Crucial for deconvolution of functional marker signal
 ## 📊 Coming Soon
 Graphical breakdown of reallocation logic
 Support for additional normalization schemes (e.g. quantile)
+
 UNHUDDLE will be installable via `pip install unhuddle`
 
 ## 📣 Citation & License
