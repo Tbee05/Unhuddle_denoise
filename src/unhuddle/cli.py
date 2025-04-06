@@ -16,7 +16,7 @@ def setup_logging(log_level):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="UNHUDDLE: Deconvolute and normalize multiplexed tissue data from FOV folders."
+        description="UNHUDDLE: Deconvolute and normalize highly multiplex proteomics tissue data."
     )
 
     parser.add_argument("--base_path", type=str, required=True, help="Base path containing FOV folders")

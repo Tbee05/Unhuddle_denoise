@@ -1,9 +1,9 @@
 [project]
 name = "unhuddle"
 version = "0.1.0"
-description = "Signal deconvolution and normalization in densely packed tissue using UNHUDDLE."
+description = "Highly multiplex proteomics: Signal deconvolution and normalization in densely packed tissue using UNHUDDLE."
 authors = [
-  { name = "Your Name", email = "your.email@institute.edu" }
+  { name = "Troy Noordenbos", email = "tnoorden@stanford.edu" }
 ]
 readme = "README.md"
 license = { text = "MIT" }
@@ -30,6 +30,9 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.scripts]
+unhuddle = "unhuddle.cli:main"
 
 # Optional: Dev dependencies (install via `pip install .[dev]`)
 [project.optional-dependencies]
