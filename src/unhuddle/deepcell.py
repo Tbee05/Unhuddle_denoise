@@ -20,6 +20,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 
 
+import os
+import glob
+import re
+import logging
+import numpy as np
+import tifffile
+
+
 def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_markers=None):
     if blue_markers is None:
         blue_markers = []
@@ -34,6 +42,7 @@ def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_mark
             continue
         marker = m.group("marker")
         img = tifffile.imread(f).astype(np.float32)
+
         if marker in red_markers:
             channels["red"] = img if channels["red"] is None else channels["red"] + img
         elif marker in green_markers:
@@ -41,26 +50,37 @@ def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_mark
         elif marker in blue_markers:
             channels["blue"] = img if channels["blue"] is None else channels["blue"] + img
 
-    def clip(img): return np.clip(img, 0, 255).astype(np.uint8)
+    def clip(img):
+        return np.clip(img, 0, 255).astype(np.uint8)
 
+    # Red and Green channels are required
     for key in ["red", "green"]:
         if channels[key] is None:
-            logging.warning(f"Missing channel: {key}")
+            logging.warning(f"Missing channel: {key} — cannot generate overlay.")
             return None
 
-    if channels["blue"] is not None:
-        overlay = np.stack([clip(channels["red"]),
-                            clip(channels["green"]),
-                            clip(channels["blue"])], axis=-1)
-    else:
-        overlay = np.stack([clip(channels["red"]), clip(channels["green"])], axis=0)
+    # Fill blue with zeros if missing
+    if channels["blue"] is None:
+        channels["blue"] = np.zeros_like(channels["red"], dtype=np.float32)
+        logging.info("Blue channel missing — filled with zeros.")
+
+    # Stack RGB channels and write photometric RGB TIFF
+    overlay_rgb = np.stack([
+        clip(channels["red"]),
+        clip(channels["green"]),
+        clip(channels["blue"])
+    ], axis=-1)
 
     fov_id = os.path.basename(fov_path)
     overlay_path = os.path.join(fov_path, f"overlay_{fov_id}.tiff")
-    tifffile.imwrite(overlay_path, overlay, photometric="rgb" if overlay.ndim == 3 else None)
 
-    logging.info(f"Overlay saved to {overlay_path}")
-    return overlay_path
+    try:
+        tifffile.imwrite(overlay_path, overlay_rgb, photometric="rgb")
+        logging.info(f"Overlay saved to {overlay_path}")
+        return overlay_path
+    except Exception as e:
+        logging.error(f"Failed to save RGB overlay TIFF: {e}")
+        return None
 
 
 def safe_get(driver, url, retries=3, delay=5):
