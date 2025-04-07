@@ -76,16 +76,25 @@ unhuddle \
 ```
 🚀 Try It Out on Included Demo Data
 You can run UNHUDDLE directly on the provided Tonsil demo data:
+
+linux:
 ```bash
 unhuddle \
   --base_path demodata \
   --output_base_path results/unhuddle_output \
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 CD15 \
   --create_nuclear_mask \
-  --create_deepcell_mask \
   --max_workers 1
 ```
-
+windows powershell
+```powershell
+unhuddle `
+  --base_path demodata `
+  --output_base_path results\unhuddle_output `
+  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 CD15 `
+  --create_nuclear_mask `
+  --max_workers 1
+```
 ## 🌐 DeepCell Integration Setup (Selenium + Firefox)
 UNHUDDLE can upload overlays to DeepCell.org using Selenium and Firefox — no GUI required.
 This enables automated segmentation of images through the DeepCell web interface.
