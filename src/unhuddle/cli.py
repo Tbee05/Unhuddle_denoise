@@ -42,7 +42,7 @@ def main():
     parser.add_argument("--mask_pattern", type=str, nargs="+", default=["*_0.tiff"],
                         help="Glob pattern for mask files (default '*_0.tiff')")
 
-    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="Skip FOVs if output already exists in normalization folder")
     parser.add_argument("--markers_for_normalisation", nargs="*", default=None,
