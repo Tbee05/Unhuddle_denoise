@@ -259,7 +259,7 @@ Support for additional normalization schemes (e.g. quantile)
 UNHUDDLE will be installable via `pip install unhuddle`
 
 ## 📣 Citation & License
-This tool is part of an ongoing research pipeline for high-dimensional tissue profiling.
+This tool is part of an ongoing research pipeline for high-dimensional tissue profiling originating from the Alizadeh laboratory at Stanford School of Medicine.
 Please cite appropriately once a manuscript is available. Open-source license to be defined.
 
 
