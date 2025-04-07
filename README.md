@@ -4,6 +4,8 @@
 
 UNHUDDLE is an algorithm designed to resolve multiplexed signal in densely packed tissue regions — or "cell huddles" — in multiplex spatial proteomics, where traditional segmentation and quantification blur the phenotypic signal.
 
+On the cell to cell borderpixels, shared signal is observed due to 1 resolution issues, 2 lateral bleed and 3 z-projection. Unhuddle knows the cell's neighbors, measures their mean intensity and reallocates the bordersignal to the rightful owner. 
+
 By identifying stable, broadly expressed "sensor markers" and performing per-cell normalization, UNHUDDLE enables more accurate within-cell-type comparison of functional markers (e.g., checkpoint proteins), even in spatially crowded microenvironments.
 
 ## 🚀 Getting Started with UNHUDDLE
