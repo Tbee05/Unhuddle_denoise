@@ -18,7 +18,9 @@ dependencies = [
   "tifffile",
   "tqdm",
   "selenium",
-  "requests"
+  "requests",
+  "anndata",
+  "matplotlib"
 ]
 
 [build-system]

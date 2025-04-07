@@ -49,6 +49,8 @@ def main():
                         help="Sensor markers to normalize functional markers (e.g. CD3 CD45 Vimentin)")
     parser.add_argument("--list_available_markers", action="store_true",
                         help="Print available marker names from first FOV")
+    parser.add_argument("--create_adata", action="store_true",
+                        help="Integrates data from all FOVs in a single AnnData object")
 
     args = parser.parse_args()
 
@@ -57,7 +59,6 @@ def main():
 
     setup_logging(args.log_level)
 
-    # --- Print markers and exit ---
     if args.list_available_markers:
         fov_folders = [
             os.path.join(args.base_path, fov)
@@ -79,7 +80,6 @@ def main():
             print(" ", os.path.basename(f).replace(".ome.tiff", ""))
         return
 
-    # --- Create output dirs ---
     out = args.output_base_path
     dirs = {
         "morph": os.path.join(out, "morphology_features"),
@@ -87,13 +87,13 @@ def main():
         "original_sum": os.path.join(out, "original_sum"),
         "original_norm": os.path.join(out, "original_normalized"),
         "unhuddle_sum": os.path.join(out, "unhuddle_sum"),
-        "unhuddle_norm": os.path.join(out, "unhuddle_normalized")
+        "unhuddle_norm": os.path.join(out, "unhuddle_normalized"),
+        "adata": os.path.join(out, "adata_objects")
     }
 
     for d in dirs.values():
         os.makedirs(d, exist_ok=True)
 
-    # --- Collect FOV folders ---
     all_fovs = [
         os.path.join(args.base_path, fov)
         for fov in os.listdir(args.base_path)
@@ -114,7 +114,6 @@ def main():
         print("❌ No FOVs selected for processing.")
         return
 
-    # --- Launch FOV jobs ---
     results = {}
     with ProcessPoolExecutor(max_workers=args.max_workers) as executor:
         futures = {
@@ -147,9 +146,26 @@ def main():
                 logging.error(f"❌ FOV {fov} failed: {e}")
                 results[fov] = {"error": str(e)}
 
-    # --- Print summary ---
     errored = [os.path.basename(fov) for fov, res in results.items() if "error" in res or "critical_error" in res]
     if errored:
         print("\n⚠️ FOVs with errors:\n", "\n".join(errored))
     else:
         print("\n✅ All FOVs processed successfully.")
+
+    # --- Optional: Create adata object ---
+    if args.create_adata:
+        logging.info("\n📦 Creating unified AnnData object...")
+
+        from unhuddle.adata_builder import build_adata_from_outputs
+
+
+        try:
+            build_adata_from_outputs(
+                output_base_path=args.output_base_path,
+                working_path=args.base_path,
+                output_adata_name="adata1.h5ad",
+                max_workers=args.max_workers
+            )
+        except Exception as e:
+            logging.error(f"❌ Adata creation failed: {e}")
+            print(f"[ERROR] Adata creation failed: {e}")
