@@ -38,7 +38,8 @@ def process_fov_pipeline(
     blue_markers,
     log_level,
     deepcell_resolution,
-    nuclear_markers_overlay
+    nuclear_markers_overlay,
+    membrane_markers_overlay
 ):
     from unhuddle.cli import setup_logging
     setup_logging(log_level)
@@ -50,7 +51,7 @@ def process_fov_pipeline(
             overlay_file = create_deepcell_mask_overlay(
                 fov_path,
                 red_markers=nuclear_markers_overlay,
-                green_markers=membrane_markers,
+                green_markers=membrane_markers_overlay,
                 blue_markers=blue_markers
             )
 

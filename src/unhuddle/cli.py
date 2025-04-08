@@ -56,6 +56,12 @@ def main():
         default=None,
         help="Markers to use for DeepCell overlay (red channel). If not provided, defaults to --nuclear_markers."
     )
+    parser.add_argument(
+        "--membrane_markers_overlay",
+        nargs="+",
+        default=None,
+        help="Markers to use for DeepCell overlay (green channel). If not provided, defaults to --normalisation_markers."
+    )
 
     parser.add_argument("--membrane-markers", nargs="+", default=None,
                         help="Markers used for green channel (membrane/cytoplasm) eg CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14")
@@ -110,7 +116,10 @@ def main():
         if args.nuclear_markers_overlay is None:
             args.nuclear_markers_overlay = args.nuclear_markers
         logger.debug(f"Using nuclear_markers_overlay: {args.nuclear_markers_overlay}")
-
+        # Fallback logic: use normalisation_markers for overlay if no specific override is given
+        if args.membrane_markers_overlay is None:
+            args.nuclear_markers_overlay = args.normalisation_markers
+        logger.debug(f"Using membrane_markers_overlay: {args.membrane_markers_overlay}")
         first_fov = fov_folders[0]
         ome_files = glob.glob(os.path.join(first_fov, "*.ome.tiff"))
         if not ome_files:
@@ -184,7 +193,8 @@ def main():
                 args.blue_markers,
                 args.log_level,
                 args.deepcell_resolution,
-                nuclear_markers_overlay=args.nuclear_markers_overlay
+                args.nuclear_markers_overlay,
+                args.membrane_markers_overlay
             ): fov for fov in fov_folders
         }
 
