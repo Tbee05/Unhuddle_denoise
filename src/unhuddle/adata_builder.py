@@ -3,6 +3,7 @@ import os
 import glob
 import numpy as np
 import pandas as pd
+import logging
 import warnings
 import concurrent.futures
 from tqdm import tqdm
@@ -29,8 +30,8 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
     os.makedirs(os.path.dirname(adata_output_path), exist_ok=True)
     os.makedirs(qc_dir, exist_ok=True)
 
-    print(f"[INFO] Saving output to: {adata_output_path}")
-    print(f"[INFO] Creating QC figures in: {qc_dir}")
+    logging.info(f"[INFO] Saving output to: {adata_output_path}")
+    logging.info(f"Creating QC figures in: {qc_dir}")
 
     def get_fov_list():
         files = glob.glob(f"{output_base_path}/unhuddle_normalized/*.csv")
@@ -94,7 +95,7 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
 
     fovs = get_fov_list()
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        adatas = list(tqdm(pool.map(process_fov, fovs), total=len(fovs), desc="Reconstructing AnnData"))
+        adatas = list(tqdm(pool.map(process_fov, fovs), total=len(fovs), desc="Constructing AnnData"))
 
     adatas = [a for a in adatas if a is not None]
     if not adatas:
@@ -114,7 +115,7 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
             adata.uns["spatial"][fov] = {"segmentation": imread(mask_path)}
 
     adata.write_h5ad(adata_output_path)
-    print(f"[INFO] AnnData saved to: {adata_output_path}")
+    print(f"AnnData saved to: {adata_output_path}")
 
     # QC plot
     data = adata.obs["summed_intensity"]

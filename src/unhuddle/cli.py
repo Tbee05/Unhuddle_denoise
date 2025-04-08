@@ -151,6 +151,11 @@ def main():
         print("\n⚠️ FOVs with errors:\n", "\n".join(errored))
     else:
         print("\n✅ All FOVs processed successfully.")
+        print("📁 FOV folders updated with masks and overlays, tip: inspect pseudocolored mask renders.")
+        print(f"📄 Unhuddle normalized is ready for phenotyping: {dirs["unhuddle_norm"]}")
+        print(f"📄 Cell-level morphology metrics: {dirs["morph"]}")
+        print(f"📄 Values before Unhuddle correction and/or before normalization: {out}")
+        print()
 
     # --- Optional: Create adata object ---
     if args.create_adata:
