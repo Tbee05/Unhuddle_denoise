@@ -6,7 +6,7 @@ UNHUDDLE is an algorithm designed to resolve signal in densely packed tissue reg
 
 On the cell to cell borderpixels, shared signal is observed due to 1 resolution issues, 2 lateral bleed and 3 z-projection. Unhuddle knows the cell's neighbors, measures their mean intensity and reallocates the bordersignal to the rightful owner. 
 
-By identifying stable, broadly expressed "sensor markers" and performing per-cell normalization, UNHUDDLE enables more accurate within-cell-type comparison of functional markers (e.g., checkpoint proteins), even in spatially crowded microenvironments.
+By identifying stable, broadly expressed "normalisation markers" and performing per-cell normalization, UNHUDDLE enables more accurate within-cell-type comparison of functional markers (e.g., checkpoint proteins), even in spatially crowded microenvironments.
 
 ## 🚀 Getting Started with UNHUDDLE
 
@@ -283,8 +283,8 @@ For each FOV (field of view) folder, the following stages are run:
 
 
 ### 6. **Normalized Intensity Calculation**
-- Normalize per-cell values by a weighted mean of top **sensor markers** (e.g., CD45, CD3, Vimentin).
-- Sensor markers are broadly expressed (typically membrane or cytoplasmic) and support robust within-cell-type comparisons of functional markers like checkpoint inhibitors.
+- Normalize per-cell values by a weighted mean of top **normalisation markers** (e.g., CD45, CD3, Vimentin).
+- Normalisation markers are broadly expressed (typically membrane or cytoplasmic) and support robust within-cell-type comparisons of functional markers like checkpoint inhibitors.
 - Values are then robustly scaled per-marker using [0.1, 99.9] percentiles.
 - Output: normalized per-cell intensity matrix (values in [0, 1]).
   - `/unhuddle_normalized/{fov}.csv`, `/original_normalized/{fov}.csv`
@@ -462,7 +462,7 @@ Use --max_workers to process multiple FOVs concurrently
 
 --check_output_exist skips already-processed FOVs
 
-💡 Sensor Markers:
+💡 Normalisation Markers:
 
 Markers like CD3, CD45, Vimentin used for intra-cell normalization
 
