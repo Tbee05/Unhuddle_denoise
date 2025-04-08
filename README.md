@@ -321,7 +321,7 @@ For each FOV (field of view) folder, the following stages are run:
 | Argument                     | Description |
 |-----------------------------|-------------|
 | `--max_workers`            | Number of parallel processes (default: 1) |
-| `--create_nuclear_mask`    | Generate nuclear mask (enables N/C ratio) |
+| `--create_nuclear_mask`    | Generate nuclear mask from cell mask (enables N/C ratio) |
 | `--create_deepcell_mask`   | Generate RGB overlay & segment with DeepCell Mesmer|
 
 ### 🌐 DeepCell Settings 
