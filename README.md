@@ -318,20 +318,21 @@ For each FOV (field of view) folder, the following stages are run:
 ### 🎨 Channel Marker Options
 
 | Argument                     | Description |
-|-----------------------------|-------------|
-| `--red-markers`            | Markers for red channel (nuclear) |
-| `--green-markers`          | Markers for green channel (membrane/cytoplasm) |
+|-----------------------------|-------------|  
+| `--markers_for_normalisation` | **Required** unless using `--list_available_markers` |
+| `--nuclear-markers`            | Markers for red channel (nuclear) **Required when** `--creat_deepcell_mask` |
+| `--membrane-markers`          | Markers for green channel (membrane/cytoplasm) **Required when** `--creat_deepcell_mask` |
 | `--blue-markers`           | Optional markers for blue channel |
-| `--markers_for_normalisation` | **REQUIRED** unless using `--list_available_markers` |
+
 | `--list_available_markers` | List markers and exit |
 
 ### 🌐 DeepCell Settings
 
 | Argument                     | Description |
 |-----------------------------|-------------|
-| `--geckodriver_path`       | Path to geckodriver for Selenium |
+| `--geckodriver_path`       | Path to geckodriver for Selenium **Required when** `--creat_deepcell_mask` |
 | `--deepcell_url`           | URL of DeepCell website |
-
+| `--deepcell_resolution`           | URL of DeepCell website |
 ### 🪵 Logging
 
 | Argument                     | Description |
