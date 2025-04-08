@@ -1,6 +1,7 @@
 # src/unhuddle/utils.py
 
 import logging
+logger = logging.getLogger(__name__)
 import numpy as np
 from skimage import io
 import warnings
@@ -11,7 +12,7 @@ def save_image(path, image, description=""):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         io.imsave(path, image)
-    logging.info(f"Saved {description} at: {path}")
+    logger.info(f"Saved {description} at: {path}")
 
 
 def generate_pseudocolor_mask(mask):

@@ -3,13 +3,15 @@ import os
 import glob
 import numpy as np
 import pandas as pd
-import logging
 import warnings
 import concurrent.futures
 from tqdm import tqdm
 from anndata import AnnData, concat
 from tifffile import imread
 import matplotlib.pyplot as plt
+import logging
+logger = logging.getLogger(__name__)
+
 
 warnings.filterwarnings("ignore", message=".*converted to numpy array with dtype.*")
 
@@ -30,8 +32,8 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
     os.makedirs(os.path.dirname(adata_output_path), exist_ok=True)
     os.makedirs(qc_dir, exist_ok=True)
 
-    logging.info(f"[INFO] Saving output to: {adata_output_path}")
-    logging.info(f"Creating QC figures in: {qc_dir}")
+    logger.info(f"[INFO] Saving output to: {adata_output_path}")
+    logger.info(f"Creating QC figures in: {qc_dir}")
 
     def get_fov_list():
         files = glob.glob(f"{output_base_path}/unhuddle_normalized/*.csv")

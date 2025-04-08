@@ -2,12 +2,13 @@
 
 import os
 import glob
-import logging
 import numpy as np
 from skimage import io, measure, morphology
 from skimage.segmentation import find_boundaries
 from scipy.ndimage import binary_fill_holes
 from unhuddle.utils import save_image, generate_pseudocolor_mask
+import logging
+logger = logging.getLogger(__name__)
 
 
 def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):

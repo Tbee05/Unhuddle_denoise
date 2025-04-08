@@ -2,6 +2,8 @@
 
 import os
 import logging
+logger = logging.getLogger(__name__)
+
 
 from unhuddle.masks import process_cell_mask, process_nuclear_mask, process_membrane_masks, load_fov_files
 from unhuddle.features import extract_morphology_features, extract_protein_intensity
@@ -33,8 +35,13 @@ def process_fov_pipeline(
     markers_for_normalisation,
     red_markers,
     green_markers,
-    blue_markers
+    blue_markers,
+    log_level
 ):
+    from unhuddle.cli import setup_logging
+    setup_logging(log_level)
+    logger = logging.getLogger(__name__)
+    logger.debug(f"[{os.getpid()}] Logging ready in subprocess for {fov_path}")
     result = {"fov": fov_path}
     try:
         if create_deepcell_mask:
@@ -51,7 +58,7 @@ def process_fov_pipeline(
                     process_deepcell_overlay(overlay_file, fov_path, deepcell_url, geckodriver_path)
                     result["deepcell_processing"] = "Success"
                 except Exception as e:
-                    logging.error(f"DeepCell processing failed for {fov_path}: {e}")
+                    logger.error(f"DeepCell processing failed for {fov_path}: {e}")
                     result["deepcell_processing"] = f"Error: {e}"
             else:
                 result["deepcell_processing"] = "Overlay file not created"
@@ -62,23 +69,25 @@ def process_fov_pipeline(
             nuclear_mask = process_nuclear_mask(fov_path, cell_mask, files)
         else:
             nuclear_mask = None
-            logging.info("Skipping nuclear mask creation as per flag.")
+            logger.info("Skipping nuclear mask creation as per flag.")
     except Exception as e:
-        logging.error(f"An unexpected error occurred during mask creation for {fov_path}: {e}, skipping this FOV")
-        print(f"\n[!] Skipped FOV: {fov_path} due to mask creation failure.\n")
+        logger.error(
+            f"An unexpected error occurred during mask creation for {fov_path}: {e}, skipping this FOV",
+            exc_info=True  # ✅ show traceback in logs
+        )
         result["critical_error"] = f"Mask creation failed: {e}"
         return result
 
     try:
         morph_features = extract_morphology_features(fov_path, morph_features_dir, cell_mask, nuclear_mask)
     except Exception as e:
-        logging.error(f"Error extracting features for {fov_path}: {e}")
+        logger.error(f"Error extracting features for {fov_path}: {e}")
         result["feature_extraction_error"] = str(e)
 
     try:
         membrane_mask, memexcl_mask = process_membrane_masks(fov_path, cell_mask)
     except Exception as e:
-        logging.error(f"Error creating membrane-related masks for {fov_path}: {e}")
+        logger.error(f"Error creating membrane-related masks for {fov_path}: {e}")
         result["membrane_mask_error"] = str(e)
 
     try:
@@ -88,7 +97,7 @@ def process_fov_pipeline(
         )
         result["protein_intensity_extracted"] = True
     except Exception as e:
-        logging.error(f"Error in protein intensity extraction for {fov_path}: {e}")
+        logger.error(f"Error in protein intensity extraction for {fov_path}: {e}")
         result["protein_intensity_error"] = str(e)
 
     try:
@@ -98,7 +107,7 @@ def process_fov_pipeline(
         all_interactions = integrate_intensities_for_interactions(fov_path, merged)
         reallocation = compute_reallocation_with_checks(all_interactions, protein_features, tol=1e-6)
     except Exception as e:
-        logging.error(f"Error in object intensity analysis for {fov_path}: {e}")
+        logger.error(f"Error in object intensity analysis for {fov_path}: {e}")
         result["object_intensity_error"] = str(e)
 
     try:
@@ -107,7 +116,7 @@ def process_fov_pipeline(
         )
         result["intensity_settled"] = True
     except Exception as e:
-        logging.error(f"Error settling intensities for {fov_path}: {e}")
+        logger.error(f"Error settling intensities for {fov_path}: {e}")
         result["intensity_settlement_error"] = str(e)
 
     try:
@@ -120,7 +129,7 @@ def process_fov_pipeline(
         if norm_corrected is not None:
             output_file = os.path.join(unhuddle_norm_dir, f"{fov_name}.csv")
             norm_corrected.to_csv(output_file, index=False)
-            logging.info(f"Saved normalized intensities for {fov_name} to {output_file}")
+            logger.info(f"Saved normalized intensities for {fov_name} to {output_file}")
             result["normalized_intensity"] = True
         else:
             raise ValueError("Normalization returned None")
@@ -134,12 +143,12 @@ def process_fov_pipeline(
         if norm_original is not None:
             output_file = os.path.join(original_norm_dir, f"{fov_name}.csv")
             norm_original.to_csv(output_file, index=False)
-            logging.info(f"Saved normalized original intensities for {fov_name} to {output_file}")
+            logger.info(f"Saved normalized original intensities for {fov_name} to {output_file}")
             result["normalized_original_intensity"] = True
         else:
             raise ValueError("Normalization (original) returned None")
     except Exception as e:
-        logging.error(f"Error computing normalized intensities for {fov_path}: {e}")
+        logger.error(f"Error computing normalized intensities for {fov_path}: {e}")
         result["normalized_intensity_error"] = str(e)
 
     return result

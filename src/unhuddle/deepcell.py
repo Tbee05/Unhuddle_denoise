@@ -1,9 +1,10 @@
 # src/unhuddle/deepcell.py
+import logging
+logger = logging.getLogger(__name__)
 
 import os
 import glob
 import re
-import logging
 import numpy as np
 import tifffile
 import tempfile
@@ -20,15 +21,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 
 
-import os
-import glob
-import re
-import logging
-import numpy as np
-import tifffile
-
-
 def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_markers=None):
+    logger.debug("create_deepcell_mask_overlay entered")
     if blue_markers is None:
         blue_markers = []
 
@@ -56,13 +50,13 @@ def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_mark
     # Red and Green channels are required
     for key in ["red", "green"]:
         if channels[key] is None:
-            logging.warning(f"Missing channel: {key} — cannot generate overlay.")
+            logger.warning(f"Missing channel: {key} — cannot generate overlay.")
             return None
 
     # Fill blue with zeros if missing
     if channels["blue"] is None:
         channels["blue"] = np.zeros_like(channels["red"], dtype=np.float32)
-        logging.info("Blue channel missing — filled with zeros.")
+        logger.info("Blue channel missing — filled with zeros.")
 
     # Stack RGB channels and write photometric RGB TIFF
     overlay_rgb = np.stack([
@@ -76,10 +70,10 @@ def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_mark
 
     try:
         tifffile.imwrite(overlay_path, overlay_rgb, photometric="rgb")
-        logging.info(f"Overlay saved to {overlay_path}")
+        logger.info(f"Overlay saved to {overlay_path}")
         return overlay_path
     except Exception as e:
-        logging.error(f"Failed to save RGB overlay TIFF: {e}")
+        logger.error(f"Failed to save RGB overlay TIFF: {e}")
         return None
 
 
@@ -90,12 +84,13 @@ def safe_get(driver, url, retries=3, delay=5):
             driver.get(url)
             return
         except Exception as e:
-            logging.warning(f"Attempt {attempt + 1} failed: {e}")
+            logger.warning(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(delay)
     raise RuntimeError(f"Failed to load {url} after {retries} retries.")
 
 
 def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver_path, wait=300):
+    logger.debug("process_deepcell_overlay entered")
     tmpdir = tempfile.mkdtemp()
     profile = FirefoxProfile()
     profile.set_preference("pdfjs.disabled", True)
@@ -113,7 +108,13 @@ def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver
         WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, "//li[contains(.,'10x (1 μm/pixel)')]"))).click()
 
         upload_input = driver.find_element(By.XPATH, "//input[@type='file']")
-        upload_input.send_keys(overlay_file)
+        logger.debug(f"Overlay file to upload: {overlay_file}")
+        logger.debug(f"Resolved absolute path: {os.path.abspath(overlay_file)}")
+        logger.debug(f"File exists? {os.path.exists(overlay_file)}")
+        abs_overlay_path = os.path.abspath(overlay_file)
+        logger.debug(f"Passing to send_keys: {abs_overlay_path}")
+        upload_input.send_keys(abs_overlay_path)
+
         WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.ID, "submitButton"))).click()
 
         download_button = WebDriverWait(driver, wait).until(
@@ -140,7 +141,7 @@ def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver
         for i, tif_name in enumerate(tifs):
             out_path = os.path.join(output_dir, f"deepcell_mask_{i}.tiff")
             shutil.move(os.path.join(extract_dir, tif_name), out_path)
-            logging.info(f"Saved DeepCell result: {out_path}")
+            logger.info(f"Saved DeepCell result: {out_path}")
 
     finally:
         driver.quit()

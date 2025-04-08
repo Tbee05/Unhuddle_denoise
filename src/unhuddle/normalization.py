@@ -2,6 +2,8 @@
 import numpy as np
 import pandas as pd
 import logging
+logger = logging.getLogger(__name__)
+
 
 def fully_weighted_normalize_and_scale(matrix, var_names, sensor_markers, max_n=4, min_relative_weight=0.01,
                                        lower=0.1, upper=99.9):
@@ -87,16 +89,16 @@ def compute_normalized_intensities_for_fov(fov_folder, corrected_sum_df, sensor_
     import os
 
     fov_name = os.path.basename(fov_folder)
-    logging.info(f"Normalizing intensities for {fov_name}")
+    logger.info(f"Normalizing intensities for {fov_name}")
 
     if "Label" not in corrected_sum_df.columns:
-        logging.error(f"{fov_name} is missing required 'Label' column.")
+        logger.error(f"{fov_name} is missing required 'Label' column.")
         return fov_name, None
 
     # Extract marker columns
     marker_columns = sorted([col for col in corrected_sum_df.columns if col != 'Label'])
     raw_matrix = corrected_sum_df[marker_columns].values
-    logging.debug(f"Using marker columns: {marker_columns}")
+    logger.debug(f"Using marker columns: {marker_columns}")
 
     # Normalize and scale
     scaled_matrix, marker_counts = fully_weighted_normalize_and_scale(

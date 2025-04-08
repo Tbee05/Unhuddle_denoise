@@ -6,12 +6,29 @@ import glob
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
-from unhuddle.pipeline import process_fov_pipeline
+
 
 
 def setup_logging(log_level):
     level = getattr(logging, log_level.upper(), logging.INFO)
-    logging.basicConfig(level=level, format="%(asctime)s [%(levelname)s] %(message)s")
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        force=True
+    )
+
+    logger = logging.getLogger(__name__)
+    logger.debug("Logging has been set up")
+
+    if level == logging.DEBUG:
+        # Enable verbose logging for key third-party libraries
+        noisy_libs = ["selenium", "urllib3", "httpcore", "selenium.webdriver.remote.remote_connection"]
+        for lib in noisy_libs:
+            lib_logger = logging.getLogger(lib)
+            lib_logger.setLevel(logging.DEBUG)
+            lib_logger.propagate = True  # ensure logs reach root handlers
+        logger.debug("Selenium and network library debug logging enabled")
 
 
 def main():
@@ -31,10 +48,10 @@ def main():
     parser.add_argument("--geckodriver_path", type=str, default="geckodriver", help="Path to geckodriver binary")
     parser.add_argument("--deepcell_url", type=str, default="http://www.deepcell.org", help="DeepCell website URL")
 
-    parser.add_argument("--red-markers", nargs="+", default=["DNA1", "DNA2", "HistoneH3"],
-                        help="Markers used for red channel (nuclear)")
-    parser.add_argument("--green-markers", nargs="+", default=["CD3", "CD45", "Vimentin"],
-                        help="Markers used for green channel (membrane/cytoplasm)")
+    parser.add_argument("--nuclear-markers", nargs="+", default=None,
+                        help="Markers used for red channel (nuclear): eg DNA1 DNA2 HistoneH3")
+    parser.add_argument("--membrane-markers", nargs="+", default=None,
+                        help="Markers used for green channel (membrane/cytoplasm) eg CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14")
     parser.add_argument("--blue-markers", nargs="+", default=[], help="Optional markers for blue channel")
 
     parser.add_argument("--fovs", nargs="*", default=None,
@@ -53,11 +70,18 @@ def main():
                         help="Integrates data from all FOVs in a single AnnData object")
 
     args = parser.parse_args()
+    setup_logging(args.log_level)
+    logging.debug("Logging has been set up")
+    logger = logging.getLogger("unhuddle")
+    logger.debug("Logger '%s' is active at level: %s", logger.name, logger.level)
+
+    from unhuddle.pipeline import process_fov_pipeline
+    if args.create_deepcell_mask:
+        if not args.nuclear_markers or not args.membrane_markers or not args.geckodriver_path:
+            parser.error("--nuclear-markers, --green-markers and --geckodriver_path are required when --create_deepcell_mask is used.")
 
     if not args.list_available_markers and not args.markers_for_normalisation:
         parser.error("--markers_for_normalisation is required unless --list_available_markers is used.")
-
-    setup_logging(args.log_level)
 
     if args.list_available_markers:
         fov_folders = [
@@ -75,11 +99,16 @@ def main():
             print("❌ No .ome.tiff files in first FOV.")
             return
 
-        print(f"\n✅ Available markers in FOV '{os.path.basename(first_fov)}':\n")
-        for f in sorted(ome_files):
-            print(" ", os.path.basename(f).replace(".ome.tiff", ""))
-        return
+        marker_names = sorted([
+            os.path.basename(f).replace(".ome.tiff", "")
+            for f in ome_files
+        ])
 
+        print(f"\nAvailable markers in FOV '{os.path.basename(first_fov)}':")
+        print("list:", " ".join(marker_names))
+        print("\n✅ rerun without --available_markers to start the pipeline")
+        print()
+        return
     out = args.output_base_path
     dirs = {
         "morph": os.path.join(out, "morphology_features"),
@@ -132,9 +161,10 @@ def main():
                 args.deepcell_url,
                 args.mask_pattern,
                 args.markers_for_normalisation,
-                args.red_markers,
-                args.green_markers,
-                args.blue_markers
+                args.nuclear_markers,
+                args.membrane_markers,
+                args.blue_markers,
+                args.log_level
             ): fov for fov in fov_folders
         }
 

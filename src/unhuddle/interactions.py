@@ -2,11 +2,12 @@
 
 import os
 import glob
-import logging
 import numpy as np
 import pandas as pd
 from collections import defaultdict, Counter
 from skimage import io
+import logging
+logger = logging.getLogger(__name__)
 
 
 def compute_border_interactions(cell_mask, membrane_mask):
@@ -84,7 +85,7 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
     return interactions
 
 def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
-    logging.info("Reallocating intensities...")
+    logger.info("Reallocating intensities...")
 
     mean_intensity = {
         (row["Label"], col.replace("_ExclusionMembrane_Mean_Intensity", "")): row[col]

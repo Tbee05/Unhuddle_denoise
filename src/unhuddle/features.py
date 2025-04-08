@@ -2,11 +2,12 @@
 
 import os
 import glob
-import logging
 import numpy as np
 import pandas as pd
 from skimage import io, measure, morphology
 from scipy import ndimage
+import logging
+logger = logging.getLogger(__name__)
 
 
 from unhuddle.utils import save_image, generate_pseudocolor_mask
@@ -21,18 +22,18 @@ def extract_morphology_features(fov_folder, morph_features_dir, cell_mask, nucle
     features_list = []
     try:
         fov_name = os.path.basename(fov_folder)
-        logging.info(f"Extracting features for FOV: {fov_name}")
+        logger.info(f"Extracting features for FOV: {fov_name}")
 
         # Load nuclear mask if not provided.
         if nuclear_mask is None:
-            logging.info("No nuclear mask provided; nuclear features will be set to NaN.")
+            logger.info("No nuclear mask provided; nuclear features will be set to NaN.")
 
         # Load images for intensity (assumes they exist).
         dna1_paths = glob.glob(os.path.join(fov_folder, '*DNA1.ome.tiff'))
         dna2_paths = glob.glob(os.path.join(fov_folder, '*DNA2.ome.tiff'))
         histoneh3_paths = glob.glob(os.path.join(fov_folder, '*HistoneH3.ome.tiff'))
         if not (dna1_paths and dna2_paths and histoneh3_paths):
-            logging.error(f"One or more intensity image files are missing in {fov_folder}")
+            logger.error(f"One or more intensity image files are missing in {fov_folder}")
             return (features_list, {})
         dna1_image = io.imread(dna1_paths[0])
         dna2_image = io.imread(dna2_paths[0])
@@ -45,7 +46,7 @@ def extract_morphology_features(fov_folder, morph_features_dir, cell_mask, nucle
         else:
             nuclear_regions = {}
         if not cell_regions:
-            logging.error(f"No cell regions found for FOV {fov_name}. Skipping.")
+            logger.error(f"No cell regions found for FOV {fov_name}. Skipping.")
             return (features_list, {})
 
         for region in cell_regions:
@@ -126,20 +127,20 @@ def extract_morphology_features(fov_folder, morph_features_dir, cell_mask, nucle
         morph_features = pd.DataFrame(features_list)
         csv_path = os.path.join(morph_features_dir, f"{fov_name}.csv")
         morph_features.to_csv(csv_path, index=False)
-        logging.info(f"Saved features for FOV {fov_name} to {csv_path}")
+        logger.info(f"Saved features for FOV {fov_name} to {csv_path}")
     except Exception as e:
-        logging.error(f"Error extracting features for FOV {fov_folder}: {e}")
+        logger.error(f"Error extracting features for FOV {fov_folder}: {e}")
     return (morph_features)
 
 def extract_protein_intensity(fov_folder, protein_features_dir, morph_features, cell_mask,
                               membrane_mask, memexcl_mask):
     try:
         fov_name = os.path.basename(fov_folder)
-        logging.info(f"Processing protein intensities for FOV: {fov_name}")
+        logger.info(f"Processing protein intensities for FOV: {fov_name}")
 
         # Extract Labels and Areas directly from morph_features
         if not {"Label", "Area"}.issubset(morph_features.columns):
-            logging.error(f"Missing 'Label' or 'Area' columns in morph_features for {fov_name}, skipping.")
+            logger.error(f"Missing 'Label' or 'Area' columns in morph_features for {fov_name}, skipping.")
             return None
 
         labels = morph_features["Label"].values
@@ -150,9 +151,9 @@ def extract_protein_intensity(fov_folder, protein_features_dir, morph_features, 
         unique_labels = unique_labels[unique_labels != 0]
         n_labels = len(unique_labels)
 
-        logging.debug(f"Number of labels in cell mask: {n_labels}")
+        logger.debug(f"Number of labels in cell mask: {n_labels}")
         if len(areas) != n_labels:
-            logging.warning(f"Mismatch: {len(areas)} areas vs. {n_labels} labels for {fov_name}")
+            logger.warning(f"Mismatch: {len(areas)} areas vs. {n_labels} labels for {fov_name}")
 
         # Initialize results dictionary
         results = {"FOV": [fov_name] * n_labels, "Label": unique_labels.tolist()}
@@ -170,7 +171,7 @@ def extract_protein_intensity(fov_folder, protein_features_dir, morph_features, 
             mem_sum = np.atleast_1d(ndimage.sum(marker_image, labels=membrane_mask, index=unique_labels))
             memexcl_sum = np.atleast_1d(ndimage.sum(marker_image, labels=memexcl_mask, index=unique_labels))
 
-            logging.debug(f"Marker {marker_name}: cell_sum: {len(cell_sum)}, "
+            logger.debug(f"Marker {marker_name}: cell_sum: {len(cell_sum)}, "
                           f"mem_sum: {len(mem_sum)}, memexcl_sum: {len(memexcl_sum)}")
 
             # Handle cases where membrane exclusion sum is zero but area is nonzero
@@ -196,10 +197,10 @@ def extract_protein_intensity(fov_folder, protein_features_dir, morph_features, 
         # Save to CSV
         output_csv_path = os.path.join(protein_features_dir, f"{fov_name}.csv")
         protein_features.to_csv(output_csv_path, index=False)
-        logging.info(f"Saved protein intensity summary for FOV: {fov_folder}")
+        logger.info(f"Saved protein intensity summary for FOV: {fov_folder}")
 
         return protein_features  # Return the DataFrame
 
     except Exception as e:
-        logging.error(f"Error in protein intensity extraction for FOV {fov_folder}: {e}")
+        logger.error(f"Error in protein intensity extraction for FOV {fov_folder}: {e}")
         return None  # Return None in case of failure
