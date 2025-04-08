@@ -68,6 +68,13 @@ def main():
                         help="Print available marker names from first FOV")
     parser.add_argument("--create_adata", action="store_true",
                         help="Integrates data from all FOVs in a single AnnData object")
+    parser.add_argument(
+        "--deepcell_resolution",
+        type=int,
+        choices=[10, 20, 40, 60, 100],
+        default=10,
+        help="Objective magnification to select in DeepCell UI (e.g., 10, 20, 40)"
+    )
 
     args = parser.parse_args()
     setup_logging(args.log_level)
@@ -164,7 +171,8 @@ def main():
                 args.nuclear_markers,
                 args.membrane_markers,
                 args.blue_markers,
-                args.log_level
+                args.log_level,
+                args.deepcell_resolution
             ): fov for fov in fov_folders
         }
 

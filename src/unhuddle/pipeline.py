@@ -36,7 +36,8 @@ def process_fov_pipeline(
     red_markers,
     green_markers,
     blue_markers,
-    log_level
+    log_level,
+    deepcell_resolution
 ):
     from unhuddle.cli import setup_logging
     setup_logging(log_level)
@@ -55,7 +56,7 @@ def process_fov_pipeline(
             result["deepcell_overlay_file"] = overlay_file
             if overlay_file:
                 try:
-                    process_deepcell_overlay(overlay_file, fov_path, deepcell_url, geckodriver_path)
+                    process_deepcell_overlay(overlay_file, fov_path, deepcell_url, geckodriver_path, deepcell_resolution)
                     result["deepcell_processing"] = "Success"
                 except Exception as e:
                     logger.error(f"DeepCell processing failed for {fov_path}: {e}")

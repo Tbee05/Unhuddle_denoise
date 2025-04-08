@@ -89,8 +89,16 @@ def safe_get(driver, url, retries=3, delay=5):
     raise RuntimeError(f"Failed to load {url} after {retries} retries.")
 
 
-def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver_path, wait=300):
+def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver_path, deepcell_resolution=10, wait=300):
     logger.debug("process_deepcell_overlay entered")
+    MAG_TO_LABEL = {
+        10: "10x (1 μm/pixel)",
+        20: "20x (0.5 μm/pixel)",
+        40: "40x (0.25 μm/pixel)",
+        60: "60x (0.1667 μm/pixel)",
+        100: "100x (0.1 μm/pixel)"
+    }
+
     tmpdir = tempfile.mkdtemp()
     profile = FirefoxProfile()
     profile.set_preference("pdfjs.disabled", True)
@@ -105,7 +113,13 @@ def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver
         safe_get(driver, deepcell_url)
         WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".MuiButton-containedSecondary"))).click()
         WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.ID, "input-resolution-select"))).click()
-        WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, "//li[contains(.,'10x (1 μm/pixel)')]"))).click()
+        res_label = MAG_TO_LABEL.get(deepcell_resolution, "10x (1 μm/pixel)")
+        res_xpath = f"//li[contains(.,'{res_label}')]"
+        WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, res_xpath))).click()
+        logger.debug(f"Selected resolution on DeepCell UI: {res_label}")
+
+        WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, res_xpath))).click()
+        logger.debug(f"Selected resolution on DeepCell UI: {deepcell_resolution}")
 
         upload_input = driver.find_element(By.XPATH, "//input[@type='file']")
         logger.debug(f"Overlay file to upload: {overlay_file}")
