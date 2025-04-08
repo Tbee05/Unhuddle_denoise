@@ -37,6 +37,7 @@ def extract_morphology_features(fov_folder, morph_features_dir, cell_mask, files
         # Load nuclear marker images dynamically
         nuclear_images = {}
         for marker in nuclear_markers:
+            if marker not in files or len(files[marker]) == 0:
                 logger.warning(f"Nuclear marker {marker} not found in files for {fov_folder}")
                 continue
             img = io.imread(files[marker][0]).astype(np.float32)
