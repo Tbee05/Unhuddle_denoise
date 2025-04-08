@@ -33,8 +33,8 @@ def process_fov_pipeline(
     deepcell_url,
     mask_pattern,
     markers_for_normalisation,
-    red_markers,
-    green_markers,
+    nuclear_markers,
+    membrane_markers,
     blue_markers,
     log_level,
     deepcell_resolution
@@ -48,8 +48,8 @@ def process_fov_pipeline(
         if create_deepcell_mask:
             overlay_file = create_deepcell_mask_overlay(
                 fov_path,
-                red_markers=red_markers,
-                green_markers=green_markers,
+                red_markers=nuclear_markers,
+                green_markers=membrane_markers,
                 blue_markers=blue_markers
             )
 
@@ -64,10 +64,11 @@ def process_fov_pipeline(
             else:
                 result["deepcell_processing"] = "Overlay file not created"
 
-        files = load_fov_files(fov_path, mask_pattern)
+        files = load_fov_files(fov_path, nuclear_markers, mask_pattern)
+
         cell_mask = process_cell_mask(fov_path, files["mask"])
         if create_nuclear_mask:
-            nuclear_mask = process_nuclear_mask(fov_path, cell_mask, files)
+            nuclear_mask = process_nuclear_mask(fov_path, cell_mask, files, nuclear_markers)
         else:
             nuclear_mask = None
             logger.info("Skipping nuclear mask creation as per flag.")
@@ -80,7 +81,8 @@ def process_fov_pipeline(
         return result
 
     try:
-        morph_features = extract_morphology_features(fov_path, morph_features_dir, cell_mask, nuclear_mask)
+        morph_features = extract_morphology_features(fov_path, morph_features_dir, cell_mask, files, nuclear_markers, nuclear_mask)
+
     except Exception as e:
         logger.error(f"Error extracting features for {fov_path}: {e}")
         result["feature_extraction_error"] = str(e)
@@ -94,7 +96,7 @@ def process_fov_pipeline(
     try:
         protein_features = extract_protein_intensity(
             fov_path, protein_features_dir, morph_features,
-            cell_mask, membrane_mask, memexcl_mask
+            cell_mask, membrane_mask, memexcl_mask, nuclear_markers
         )
         result["protein_intensity_extracted"] = True
     except Exception as e:

@@ -11,20 +11,39 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_fov_files(fov_folder, mask_patterns=["*_0.tiff"]):
+
+def load_fov_files(fov_folder, nuclear_markers=None, mask_patterns=["*_0.tiff"]):
+    """
+    Load mask and marker files for a single FOV.
+
+    Args:
+        fov_folder (str): Path to the FOV folder.
+        nuclear_markers (list[str]): List of marker names to look for.
+        mask_patterns (list[str]): Glob patterns for mask files (e.g. ["*_0.tiff"]).
+
+    Returns:
+        dict: {
+            "mask": [path],
+            "<marker_name>": [file] for each nuclear marker found
+        }
+    """
+    # Find mask files
     mask_files = []
     for pattern in mask_patterns:
         mask_files.extend(glob.glob(os.path.join(fov_folder, pattern)))
 
     if len(mask_files) != 1:
-        raise ValueError(f"Expected 1 mask file in {fov_folder}, found {len(mask_files)}: {mask_files}")
+        raise ValueError(f"Expected exactly 1 mask file in {fov_folder}, found {len(mask_files)}: {mask_files}")
 
-    files = {
-        "mask": mask_files,
-        "dna2": glob.glob(os.path.join(fov_folder, '*DNA2.ome.tiff')),
-        "dna1": glob.glob(os.path.join(fov_folder, '*DNA1.ome.tiff')),
-        "histoneh3": glob.glob(os.path.join(fov_folder, '*HistoneH3.ome.tiff'))
-    }
+    files = {"mask": mask_files}
+
+    # Find nuclear marker files
+    if nuclear_markers:
+        for marker in nuclear_markers:
+            marker_glob = os.path.join(fov_folder, f"{marker}.ome.tiff")
+            matched = glob.glob(marker_glob)
+            files[marker] = matched  # list, even if empty
+
     return files
 
 
@@ -41,11 +60,14 @@ def process_cell_mask(fov_folder, mask_files):
     return cell_mask
 
 
-def process_nuclear_mask(fov_folder, cell_mask, files):
-    dna1 = io.imread(files["dna1"][0])
-    dna2 = io.imread(files["dna2"][0])
-    h3 = io.imread(files["histoneh3"][0])
-    nuclear_signal = dna1 + dna2 + h3
+def process_nuclear_mask(fov_folder, cell_mask, files, nuclear_markers):
+    # Load and sum all nuclear marker channels
+    nuclear_signal = None
+    for marker in nuclear_markers:
+        if marker not in files or not files[marker]:
+            raise ValueError(f"Nuclear marker '{marker}' not found in files for {fov_folder}")
+        img = io.imread(files[marker][0]).astype(np.float32)
+        nuclear_signal = img if nuclear_signal is None else nuclear_signal + img
 
     nuclear_mask = np.zeros_like(cell_mask, dtype=np.uint16)
     for label in np.unique(cell_mask):
