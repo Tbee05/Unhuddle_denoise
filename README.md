@@ -59,26 +59,23 @@ base_path/
 │   ├── CD3.ome.tiff
 │   └── ...
 ```
-
 Each FOV folder should contain:
 - Denoised marker images (`{marker}.ome.tiff`, shape: `H x W`, dtype: `float32/64`)
 - Optionally: a segmentation mask (`*_mask_0.tiff`, shape:   `H x W` or `Z x H x W`, dtype: `uint16`)  
   If a mask is not provided, one can be generated using `--create_deepcell_mask`.
 
-
-### 🧪 6. Run the Pipeline
-```bash
-unhuddle \
-  --base_path /path/to/input_fovs \
-  --output_base_path /path/to/output_folder \
-  --markers_for_normalisation CD45 CD3 Vimentin \
-  --create_nuclear_mask \
-  --create_deepcell_mask \
-  --max_workers 1
+🎯**protip:**  
+contain the patientID in the FOV-name: "{patientID}_{FOVnumber}".  
+NB do not use underscores within patientID or FOVnumber.
+ 
+example for the first fov of patient 23:
 ```
-🚀 Try It Out on Included Demo Data
-You can run UNHUDDLE directly on the provided Tonsil demo data:
+base_path/
+├── P23_1/
+│   ├── CD3.ome.tiff
+```
 
+### 🧪 6. Run the Pipeline on Included Demo Data
 linux:
 ```bash
 unhuddle \
@@ -86,7 +83,8 @@ unhuddle \
   --output_base_path results/unhuddle_output \
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 CD15 \
   --create_nuclear_mask \
-  --max_workers 1
+  --max_workers 1 \
+  --create_adata
 ```
 windows powershell
 ```powershell
@@ -95,7 +93,8 @@ unhuddle `
   --output_base_path results\unhuddle_output `
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 CD15 `
   --create_nuclear_mask `
-  --max_workers 1
+  --max_workers 1 `
+  --create_adata
 ```
 ## 🌐 DeepCell Integration Setup (Selenium + Firefox)
 UNHUDDLE can upload overlays to DeepCell.org using Selenium and Firefox — no GUI required.
@@ -168,39 +167,125 @@ For each FOV (field of view) folder, the following stages are run:
 - Generate RGB overlays from selected markers.
 - Use Selenium to upload to DeepCell.org, download results, and integrate mask into downstream analysis.
 
+### 8. **Optional save all the FOV data to Anndata object**
+- integrated h5ad object ready for use with scanpy or for rendering annotated FOV images
+
+## 🧰 Available Arguments
+
+### 📂 Input / Output
+
+| Argument                     | Description |
+|-----------------------------|-------------|
+| `--base_path`               | Path to folder containing FOV subfolders |
+| `--output_base_path`       | Where to write processed outputs |
+| `--fovs`                   | List of FOV folder names to process (optional) |
+| `--mask_pattern`           | Glob pattern(s) for mask files (e.g. `*_mask_0.tiff`) |
+| `--check_output_exist`     | Skip FOVs if output already exists |
+| `--create_adata`           | Reconciles all data into a single `.h5ad` file |
+
+### ⚙️ Processing Options
+
+| Argument                     | Description |
+|-----------------------------|-------------|
+| `--max_workers`            | Number of parallel processes (default: 1) |
+| `--create_nuclear_mask`    | Generate nuclear mask (enables N/C ratio) |
+| `--create_deepcell_mask`   | Generate RGB overlay & segment with DeepCell |
+
+### 🎨 Channel Marker Options
+
+| Argument                     | Description |
+|-----------------------------|-------------|
+| `--red-markers`            | Markers for red channel (nuclear) |
+| `--green-markers`          | Markers for green channel (membrane/cytoplasm) |
+| `--blue-markers`           | Optional markers for blue channel |
+| `--markers_for_normalisation` | **REQUIRED** unless using `--list_available_markers` |
+| `--list_available_markers` | List markers and exit |
+
+### 🌐 DeepCell Settings
+
+| Argument                     | Description |
+|-----------------------------|-------------|
+| `--geckodriver_path`       | Path to geckodriver for Selenium |
+| `--deepcell_url`           | URL of DeepCell website |
+
+### 🪵 Logging
+
+| Argument                     | Description |
+|-----------------------------|-------------|
+| `--log-level`              | One of: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+
+---
+## 🧬 UNHUDDLE AnnData Object Guide
+### 🧬 `adata.obs` — Per-cell annotations
+
+| Column             | Description                                                                 |
+|--------------------|-----------------------------------------------------------------------------|
+| `cell_id` *(index)* | Unique cell identifier: **`{fov}_{Label}`**, e.g., `P23_1_42`               |
+| `fov`              | Field of View name: **`{patientID}_{FOVnumber}`**, e.g., `P23_1`             |
+| `patient_id`       | Derived from FOV name, e.g., `P23`                                           |
+| `summed_intensity` | Total protein intensity for that cell (sum of normalized values)            |
+| `QC_no_nucleus`    | Boolean flag indicating no nuclear signal                                   |
+| `...`              | All other morphology features (area, eccentricity, etc.)                    |
+
 ---
 
-## 🧪 Example CLI Usage
+### 🎯 `adata.X` — Normalized protein expression
 
-```bash
-python run_pipeline.py \
-  --base_path /data/my_experiment \
-  --output_base_path /results/my_experiment \
-  --markers_for_normalisation CD45 CD3 Vimentin \
-  --create_nuclear_mask \
-  --create_deepcell_mask \
-  --max_workers 4
-```
-```bash
-🧾 Argument Reference
-Argument	Description
---base_path	Path to folder containing FOV subfolders
---output_base_path	Where to write processed outputs
---max_workers	Number of parallel processes (default: 1)
---create_nuclear_mask	Generate nuclear mask (enables N/C ratio)
---create_deepcell_mask	Generate RGB overlay & segment with DeepCell
---red-markers	Markers for red channel (nuclear)
---green-markers	Markers for green channel (membrane/cytoplasm)
---blue-markers	Optional markers for blue channel
---geckodriver_path	Path to geckodriver for Selenium
---deepcell_url	URL of DeepCell website
---fovs	List of FOV folder names to process (optional)
---mask_pattern	Glob pattern(s) for mask files (eg *_mask_0.tiff)
---list_available_markers	List markers and exit
---log-level	One of: DEBUG, INFO, WARNING, ERROR
---check_output_exist	Skip FOVs if output already exists
---markers_for_normalisation	REQUIRED unless using --list_available_markers
-```
+- Shape: `[n_cells, n_markers]`
+- Values are in `[0, 1]`, robustly scaled
+- Marker names are in `adata.var_names`
+
+---
+
+### 📚 `adata.var_names`
+
+- List of markers (channels) used for quantification
+
+---
+
+### 🌍 `adata.obsm`
+
+| Key               | Description                                               |
+|------------------|-----------------------------------------------------------|
+| `spatial`         | `[Centroid_Row, Centroid_Col]`                            |
+| `nuclear_spatial` | `[Nucleus_Centroid_Row, Nucleus_Centroid_Col]`           |
+
+---
+
+### 🧬 `adata.layers`
+
+| Layer Key         | Description                                               |
+|-------------------|-----------------------------------------------------------|
+| `sum_unhuddle`    | Corrected per-cell intensities before normalization       |
+| `sum_original`    | Raw intensities prior to interaction reallocation         |
+
+---
+
+### 🧪 `adata.uns`
+
+| Key                | Description                                              |
+|--------------------|----------------------------------------------------------|
+| `marker-list`      | List of measured marker names                            |
+| `fov-list`         | All FOV identifiers (e.g., `P23_1`)                      |
+| `patient_id-list`  | All unique patient IDs                                   |
+| `spatial`          | Dict of segmentation masks per FOV                       |
+| → `spatial[fov]['segmentation']` | 2D numpy array with segmentation labels   |
+
+---
+
+## 🧠 Identifier Format
+
+- `cell_id` = `{fov}_{Label}`  
+  Example: `P23_1_42`
+
+- `fov` = `{patientID}_{FOVnumber}`  
+  Example: `P23_1`
+
+- `Label` = integer ID in segmentation masks (i.e., pixel regions in `.tiff`)
+
+---
+
+
 
 ## 📎 Notes
 ✅ Python Compatibility:
