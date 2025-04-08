@@ -81,7 +81,7 @@ linux:
 unhuddle \
   --base_path demodata \
   --output_base_path results/unhuddle_output \
-  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 CD15 \
+  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
   --create_nuclear_mask \
   --max_workers 1 \
   --create_adata
@@ -91,7 +91,7 @@ windows powershell
 unhuddle `
   --base_path demodata `
   --output_base_path results\unhuddle_output `
-  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 CD15 `
+  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
   --create_nuclear_mask `
   --max_workers 1 `
   --create_adata
