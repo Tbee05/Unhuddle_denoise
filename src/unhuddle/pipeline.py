@@ -34,7 +34,6 @@ def process_fov_pipeline(
     mask_pattern,
     markers_for_normalisation,
     nuclear_markers,
-    membrane_markers,
     blue_markers,
     log_level,
     deepcell_resolution,
