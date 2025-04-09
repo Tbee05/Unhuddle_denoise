@@ -229,12 +229,11 @@ unhuddle \
   --base_path path/to/dir_containing_individual_fov_folders \
   --output_base_path path/to/unhuddle_output \
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
+  --nuclear_markers DNA1 DNA2 HistoneH3 \
   --create_nuclear_mask \
   --create_deepcell_mask \
   --deepcell_resolution 10 \
   --geckodriver_path path/to/geckodriver_binary \
-  --nuclear_markers DNA1 DNA2 HistoneH3 \
-  --membrane_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
   --max_workers 1 \
   --create_adata
 ```
@@ -244,12 +243,11 @@ unhuddle `
   --base_path path\to\dir_containing_individual_fov_folders `
   --output_base_path path\to\unhuddle_output `
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
+  --nuclear_markers DNA1 DNA2 HistoneH3 `
   --create_nuclear_mask `
   --create_deepcell_mask `
   --deepcell_resolution 10 `
   --geckodriver_path path\to\geckodriver_binary `
-  --nuclear_markers DNA1 DNA2 HistoneH3 `
-  --membrane_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
   --max_workers 1 `
   --create_adata
 ```
