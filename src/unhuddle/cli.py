@@ -48,7 +48,7 @@ def main():
     parser.add_argument("--geckodriver_path", type=str, default="geckodriver", help="Path to geckodriver binary")
     parser.add_argument("--deepcell_url", type=str, default="http://www.deepcell.org", help="DeepCell website URL")
 
-    parser.add_argument("--nuclear-markers", nargs="+", default=None,
+    parser.add_argument("--nuclear_markers", nargs="+", default=None, required=True,
                         help="Markers used for red channel (nuclear): eg DNA1 DNA2 HistoneH3")
     parser.add_argument(
         "--nuclear_markers_overlay",
@@ -62,20 +62,17 @@ def main():
         default=None,
         help="Markers to use for DeepCell overlay (green channel). If not provided, defaults to --normalisation_markers."
     )
-
-    parser.add_argument("--membrane-markers", nargs="+", default=None,
-                        help="Markers used for green channel (membrane/cytoplasm) eg CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14")
-    parser.add_argument("--blue-markers", nargs="+", default=[], help="Optional markers for blue channel")
+    parser.add_argument("--blue_markers", nargs="+", default=[], help="Optional markers for blue channel")
 
     parser.add_argument("--fovs", nargs="*", default=None,
                         help="List of specific FOV folders to process")
     parser.add_argument("--mask_pattern", type=str, nargs="+", default=["*_0.tiff"],
                         help="Glob pattern for mask files (default '*_0.tiff')")
 
-    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
+    parser.add_argument("--log_level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="Skip FOVs if output already exists in normalization folder")
-    parser.add_argument("--markers_for_normalisation", nargs="*", default=None,
+    parser.add_argument("--markers_for_normalisation", nargs="*", default=None, required=True,
                         help="Sensor markers to normalize functional markers (e.g. CD3 CD45 Vimentin)")
     parser.add_argument("--list_available_markers", action="store_true",
                         help="Print available marker names from first FOV")
@@ -97,8 +94,8 @@ def main():
 
     from unhuddle.pipeline import process_fov_pipeline
     if args.create_deepcell_mask:
-        if not args.nuclear_markers or not args.membrane_markers or not args.geckodriver_path:
-            parser.error("--nuclear-markers, --green-markers and --geckodriver_path are required when --create_deepcell_mask is used.")
+        if not args.geckodriver_path:
+            parser.error("--geckodriver_path is required when --create_deepcell_mask is used.")
 
     if not args.list_available_markers and not args.markers_for_normalisation:
         parser.error("--markers_for_normalisation is required unless --list_available_markers is used.")
