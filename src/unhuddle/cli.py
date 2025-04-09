@@ -72,7 +72,7 @@ def main():
     parser.add_argument("--log_level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="Skip FOVs if output already exists in normalization folder")
-    parser.add_argument("--markers_for_normalisation", nargs="*", default=None, required=True,
+    parser.add_argument("--normalisation_markers", nargs="*", default=None, required=True,
                         help="Sensor markers to normalize functional markers (e.g. CD3 CD45 Vimentin)")
     parser.add_argument("--list_available_markers", action="store_true",
                         help="Print available marker names from first FOV")
@@ -97,8 +97,8 @@ def main():
         if not args.geckodriver_path:
             parser.error("--geckodriver_path is required when --create_deepcell_mask is used.")
 
-    if not args.list_available_markers and not args.markers_for_normalisation:
-        parser.error("--markers_for_normalisation is required unless --list_available_markers is used.")
+    if not args.list_available_markers and not args.normalisation_markers:
+        parser.error("--normalisation_markers is required unless --list_available_markers is used.")
 
     if args.list_available_markers:
         fov_folders = [
@@ -109,16 +109,9 @@ def main():
         if not fov_folders:
             print("❌ No FOV folders found.")
             return
-        # Fallback logic: use nuclear_markers for overlay if no specific override is given
-        if args.nuclear_markers_overlay is None:
-            args.nuclear_markers_overlay = args.nuclear_markers
-        logger.debug(f"Using nuclear_markers_overlay: {args.nuclear_markers_overlay}")
-        # Fallback logic: use normalisation_markers for overlay if no specific override is given
-        if args.membrane_markers_overlay is None:
-            args.nuclear_markers_overlay = args.normalisation_markers
-        logger.debug(f"Using membrane_markers_overlay: {args.membrane_markers_overlay}")
         first_fov = fov_folders[0]
         ome_files = glob.glob(os.path.join(first_fov, "*.ome.tiff"))
+
         if not ome_files:
             print("❌ No .ome.tiff files in first FOV.")
             return
@@ -133,6 +126,14 @@ def main():
         print("\n✅ rerun without --available_markers to start the pipeline")
         print()
         return
+    # Fallback logic: use nuclear_markers for overlay if no specific override is given
+    if args.nuclear_markers_overlay is None:
+        args.nuclear_markers_overlay = args.nuclear_markers
+    logging.info(f"Using nuclear_markers_overlay: {args.nuclear_markers_overlay}")
+    # Fallback logic: use normalisation_markers for overlay if no specific override is given
+    if args.membrane_markers_overlay is None:
+        args.membrane_markers_overlay = args.normalisation_markers
+    logging.info(f"Using membrane_markers_overlay: {args.membrane_markers_overlay}")
     out = args.output_base_path
     dirs = {
         "morph": os.path.join(out, "morphology_features"),
@@ -184,7 +185,7 @@ def main():
                 args.geckodriver_path,
                 args.deepcell_url,
                 args.mask_pattern,
-                args.markers_for_normalisation,
+                args.normalisation_markers,
                 args.nuclear_markers,
                 args.blue_markers,
                 args.log_level,
