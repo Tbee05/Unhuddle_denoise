@@ -220,8 +220,8 @@ Or in Windows:
 ```
 
 ### 🚀🚀🚀 7. Run the full End-to-End Pipeline
-**protip:** add `--list_available_markers` to double check the available markers  
-**protip:** add `--check_output_exist` to rerun the command; skips fovs that already have output  
+🎯**protip:** add `--list_available_markers` to double check the available markers  
+🎯**protip:** add `--check_output_exist` to rerun the command; skips fovs that already have output  
 
 linux:
 ```bash
