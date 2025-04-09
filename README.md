@@ -80,6 +80,7 @@ linux:
 unhuddle \
   --base_path demodata \
   --output_base_path results/unhuddle_output \
+  --nuclear_markers DNA1 DNA2 HistoneH3 \
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
   --create_nuclear_mask \
   --max_workers 1 \
@@ -90,6 +91,7 @@ windows powershell
 unhuddle `
   --base_path demodata `
   --output_base_path results\unhuddle_output `
+  --nuclear_markers DNA1 DNA2 HistoneH3 `
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
   --create_nuclear_mask `
   --max_workers 1 `
@@ -227,12 +229,11 @@ unhuddle \
   --base_path path/to/dir_containing_individual_fov_folders \
   --output_base_path path/to/unhuddle_output \
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
+  --nuclear_markers DNA1 DNA2 HistoneH3 \
   --create_nuclear_mask \
   --create_deepcell_mask \
   --deepcell_resolution 10 \
   --geckodriver_path path/to/geckodriver_binary \
-  --nuclear_markers DNA1 DNA2 HistoneH3 \
-  --membrane_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
   --max_workers 1 \
   --create_adata
 ```
@@ -242,12 +243,11 @@ unhuddle `
   --base_path path\to\dir_containing_individual_fov_folders `
   --output_base_path path\to\unhuddle_output `
   --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
+  --nuclear_markers DNA1 DNA2 HistoneH3 `
   --create_nuclear_mask `
   --create_deepcell_mask `
   --deepcell_resolution 10 `
   --geckodriver_path path\to\geckodriver_binary `
-  --nuclear_markers DNA1 DNA2 HistoneH3 `
-  --membrane_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
   --max_workers 1 `
   --create_adata
 ```
@@ -302,10 +302,10 @@ For each FOV (field of view) folder, the following stages are run:
 
 | Argument                     | Description |
 |-----------------------------|-------------|
-| `--base_path`               | Path to folder containing FOV subfolders |
-| `--output_base_path`       | Where to write processed outputs (will be created) |
+| `--base_path`               | **Required** Path to folder containing FOV subfolders |
+| `--output_base_path`       | **Required** Where to write processed outputs (will be created) |
 | `--fovs`                   | List of FOV folder names to process (optional) |
-| `--mask_pattern`           | Glob pattern(s) for user imported mask files (e.g. `*_mask_0.tiff`) |
+| `--mask_pattern`           | Glob pattern(s) for user imported mask files (e.g. `*_mask_0.tiff`). NB do not use `*.ome.tiff` |
 | `--check_output_exist`     | Skip FOVs if output already exists |
 | `--create_adata`           | Reconciles all data into a single `.h5ad` file |
 
@@ -314,6 +314,7 @@ For each FOV (field of view) folder, the following stages are run:
 | Argument                     | Description |
 |-----------------------------|-------------|  
 | `--markers_for_normalisation` | **Required** unless using `--list_available_markers` |
+| `--nuclear-markers`            | **Required** unless using `--list_available_markers` |  
 | `--list_available_markers` | List markers and exit |
 
 ### ⚙️ Processing Options
@@ -322,7 +323,7 @@ For each FOV (field of view) folder, the following stages are run:
 |-----------------------------|-------------|
 | `--max_workers`            | Number of parallel processes (default: 1) |
 | `--create_nuclear_mask`    | Generate nuclear mask from cell mask (enables N/C ratio) |
-| `--create_deepcell_mask`   | Generate RGB overlay & segment with DeepCell Mesmer|
+| `--create_deepcell_mask`   | Generate RGB overlay & segment via webloader with DeepCell Mesmer|
 
 ### 🌐 DeepCell Settings 
 
@@ -335,8 +336,8 @@ For each FOV (field of view) folder, the following stages are run:
 ### 🎨 RGB overlay creation
 | Argument                   | Description |
 |---------------------------|-------------|
-| `--nuclear-markers`            | Markers for red channel (nuclear) **Required when** `--creat_deepcell_mask` |  
-| `--membrane-markers`          | Markers for green channel (membrane/cytoplasm) **Required when** `--creat_deepcell_mask` |  
+| `--nuclear-markers_overlay`            | Markers for red channel override (nuclear) default: use `nuclear_markers`|  
+| `--membrane-markers_overlay`          | Markers for green channel override (membrane/cytoplasm) default: use `normalisation_markers` |  
 | `--blue-markers`           | Optional markers for blue channel |
 
 ### 🪵 Logging
