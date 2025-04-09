@@ -186,7 +186,6 @@ def main():
                 args.mask_pattern,
                 args.markers_for_normalisation,
                 args.nuclear_markers,
-                args.membrane_markers,
                 args.blue_markers,
                 args.log_level,
                 args.deepcell_resolution,
