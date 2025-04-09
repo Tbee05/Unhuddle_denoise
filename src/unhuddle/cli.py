@@ -98,7 +98,7 @@ def main():
             parser.error("--geckodriver_path is required when --create_deepcell_mask is used.")
 
     if not args.list_available_markers and (not args.normalisation_markers or not args.nuclear_markers):
-        parser.error("--normalisation_markers and --nuclear_markers is required unless --list_available_markers is used.")
+        parser.error("both --normalisation_markers and --nuclear_markers are required unless --list_available_markers is used.")
 
     if args.list_available_markers:
         fov_folders = [
