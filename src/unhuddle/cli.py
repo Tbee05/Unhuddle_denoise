@@ -48,19 +48,19 @@ def main():
     parser.add_argument("--geckodriver_path", type=str, default="geckodriver", help="Path to geckodriver binary")
     parser.add_argument("--deepcell_url", type=str, default="http://www.deepcell.org", help="DeepCell website URL")
 
-    parser.add_argument("--nuclear_markers", nargs="+", default=None, required=True,
-                        help="Markers used for red channel (nuclear): eg DNA1 DNA2 HistoneH3")
+    parser.add_argument("--nuclear_markers", nargs="+", default=None,
+                        help="Filter marker list for chromatin signal: eg DNA1 DNA2 HistoneH3")
     parser.add_argument(
         "--nuclear_markers_overlay",
         nargs="+",
         default=None,
-        help="Markers to use for DeepCell overlay (red channel). If not provided, defaults to --nuclear_markers."
+        help="Markers to use for DeepCell overlay (red channel - nuclear). If not provided, defaults to --nuclear_markers."
     )
     parser.add_argument(
         "--membrane_markers_overlay",
         nargs="+",
         default=None,
-        help="Markers to use for DeepCell overlay (green channel). If not provided, defaults to --normalisation_markers."
+        help="Markers to use for DeepCell overlay (green channel -membrane/cytoplasm). If not provided, defaults to --normalisation_markers."
     )
     parser.add_argument("--blue_markers", nargs="+", default=[], help="Optional markers for blue channel")
 
@@ -72,7 +72,7 @@ def main():
     parser.add_argument("--log_level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="WARNING")
     parser.add_argument("--check_output_exist", action="store_true", default=False,
                         help="Skip FOVs if output already exists in normalization folder")
-    parser.add_argument("--normalisation_markers", nargs="*", default=None, required=True,
+    parser.add_argument("--normalisation_markers", nargs="*", default=None,
                         help="Sensor markers to normalize functional markers (e.g. CD3 CD45 Vimentin)")
     parser.add_argument("--list_available_markers", action="store_true",
                         help="Print available marker names from first FOV")
@@ -97,8 +97,8 @@ def main():
         if not args.geckodriver_path:
             parser.error("--geckodriver_path is required when --create_deepcell_mask is used.")
 
-    if not args.list_available_markers and not args.normalisation_markers:
-        parser.error("--normalisation_markers is required unless --list_available_markers is used.")
+    if not args.list_available_markers and (not args.normalisation_markers and not args.nuclear_markers):
+        parser.error("--normalisation_markers and --nuclear_markers is required unless --list_available_markers is used.")
 
     if args.list_available_markers:
         fov_folders = [
