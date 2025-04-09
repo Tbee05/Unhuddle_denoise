@@ -81,7 +81,7 @@ unhuddle \
   --base_path demodata \
   --output_base_path results/unhuddle_output \
   --nuclear_markers DNA1 DNA2 HistoneH3 \
-  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
+  --normalisation_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
   --create_nuclear_mask \
   --max_workers 1 \
   --create_adata
@@ -92,7 +92,7 @@ unhuddle `
   --base_path demodata `
   --output_base_path results\unhuddle_output `
   --nuclear_markers DNA1 DNA2 HistoneH3 `
-  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
+  --normalisation_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
   --create_nuclear_mask `
   --max_workers 1 `
   --create_adata
@@ -228,7 +228,7 @@ linux:
 unhuddle \
   --base_path path/to/dir_containing_individual_fov_folders \
   --output_base_path path/to/unhuddle_output \
-  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
+  --normalisation_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 \
   --nuclear_markers DNA1 DNA2 HistoneH3 \
   --create_nuclear_mask \
   --create_deepcell_mask \
@@ -242,7 +242,7 @@ windows powershell
 unhuddle `
   --base_path path\to\dir_containing_individual_fov_folders `
   --output_base_path path\to\unhuddle_output `
-  --markers_for_normalisation CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
+  --normalisation_markers CD20 CD68 CD11b CD11c CD8a CD3 CD7 CD45RA CD45RO CD15 CD163 Vimentin CD31 CD14 `
   --nuclear_markers DNA1 DNA2 HistoneH3 `
   --create_nuclear_mask `
   --create_deepcell_mask `
@@ -309,11 +309,11 @@ For each FOV (field of view) folder, the following stages are run:
 | `--check_output_exist`     | Skip FOVs if output already exists |
 | `--create_adata`           | Reconciles all data into a single `.h5ad` file |
 
-### 🎨 Normalisation on core phenotype markers
+### 🎨 Marker definitions
 
 | Argument                     | Description |
 |-----------------------------|-------------|  
-| `--markers_for_normalisation` | **Required** unless using `--list_available_markers` |
+| `--normalisation_markers` | **Required** unless using `--list_available_markers` |
 | `--nuclear-markers`            | **Required** unless using `--list_available_markers` |  
 | `--list_available_markers` | List markers and exit |
 
