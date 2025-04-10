@@ -201,7 +201,7 @@ def main():
                 results[fov] = future.result()
             except Exception as e:
                 logging.error(f"❌ FOV {fov} failed: {e}")
-                results[fov] = {"error": str(e)}
+                results[fov] = {"fov": fov, "critical_error": str(e)}
 
     errored = [
         os.path.basename(fov)
@@ -221,9 +221,13 @@ def main():
         print("\n⚠️ Some FOVs encountered errors and may need reprocessing:")
         print("   " + "\n   ".join(errored))
         for fov in errored:
+            if fov not in results:
+                print(f"   ❌ {fov}: unknown error (no result returned)")
+                continue
             reasons = {k: v for k, v in results[fov].items() if "error" in k.lower()}
             for err_type, msg in reasons.items():
                 print(f"   ❌ {os.path.basename(fov)}: {err_type} – {msg}")
+
         print("⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay.png")
 
         print(
