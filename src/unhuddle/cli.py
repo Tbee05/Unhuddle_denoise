@@ -198,10 +198,16 @@ def main():
         for future in tqdm(as_completed(futures), total=len(futures), desc="Processing FOVs"):
             fov = futures[future]
             try:
-                results[fov] = future.result()
+                result = future.result()
+                result["fov"] = fov  # Ensure this key always exists
+                results[fov] = result
             except Exception as e:
-                logging.error(f"❌ FOV {fov} failed: {e}")
-                results[fov] = {"fov": fov, "critical_error": str(e)}
+                logging.error(f"❌ FOV {fov} crashed: {e}")
+                results[fov] = {
+                    "fov": fov,
+                    "critical_error": str(e),
+                    "crashed": True  # Optional: for analytics/debug
+                }
 
     errored = [
         os.path.basename(fov)
@@ -222,7 +228,12 @@ def main():
             if fov not in results:
                 print(f"   ❌ {fov}: unknown error (no result returned)")
                 continue
-            reasons = {k: v for k, v in results[fov].items() if "error" in k.lower()}
+            reasons = {
+                k: v for k, v in results[fov].items()
+                if "error" in k.lower() or (k.lower().startswith("deepcell") and "Error" in str(v))
+            }
+            if not reasons:
+                print(f"   ❌ {fov}: unknown error (no error key in result)")
             for err_type, msg in reasons.items():
                 print(f"   ❌ {os.path.basename(fov)}: {err_type} – {msg}")
 
