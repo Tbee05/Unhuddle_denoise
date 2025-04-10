@@ -204,15 +204,28 @@ def main():
                 results[fov] = {"error": str(e)}
 
     errored = [os.path.basename(fov) for fov, res in results.items() if "error" in res or "critical_error" in res]
+    successful = [os.path.basename(fov) for fov, res in results.items() if
+                  "error" not in res and "critical_error" not in res]
+
     if errored:
-        print("\n⚠️ FOVs with errors:\n", "\n".join(errored))
+        print("\n✅ The following FOVs were processed successfully:")
+        print("   " + "\n   ".join(successful))
+
+        print("\n⚠️ Some FOVs encountered errors and may need reprocessing:")
+        print("   " + "\n   ".join(errored))
+        print("\n⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay_{fov}.png")
+
+        print(
+            "\n📁 Processed FOV folders have updated masks and overlays — check the pseudocolored mask renders for validation.")
+        print(f"📄 Unhuddle normalized output (partial): {dirs['unhuddle_norm']}")
+        print(f"📄 Cell-level morphology metrics: {dirs['morph']}")
+        print(f"📄 Raw/pre-normalization values: {out}\n")
     else:
         print("\n✅ All FOVs processed successfully.")
-        print("📁 FOV folders updated with masks and overlays, tip: inspect pseudocolored mask renders.")
-        print(f"📄 Unhuddle normalized is ready for phenotyping: {dirs["unhuddle_norm"]}")
-        print(f"📄 Cell-level morphology metrics: {dirs["morph"]}")
-        print(f"📄 Values before Unhuddle correction and/or before normalization: {out}")
-        print()
+        print("📁 FOV folders updated with masks and overlays — tip: inspect pseudocolored mask renders.")
+        print(f"📄 Unhuddle normalized is ready for phenotyping: {dirs['unhuddle_norm']}")
+        print(f"📄 Cell-level morphology metrics: {dirs['morph']}")
+        print(f"📄 Values before Unhuddle correction and/or before normalization: {out}\n")
 
     # --- Optional: Create adata object ---
     if args.create_adata:

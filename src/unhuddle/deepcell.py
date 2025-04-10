@@ -11,6 +11,7 @@ import tempfile
 import shutil
 import zipfile
 import requests
+from skimage.io import imsave
 
 from selenium.webdriver import Firefox
 from selenium.webdriver.firefox.options import Options
@@ -21,60 +22,114 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 
 
-def create_deepcell_mask_overlay(fov_path, red_markers, green_markers, blue_markers=None):
-    logger.debug("create_deepcell_mask_overlay entered")
+import os
+import re
+import glob
+import numpy as np
+import tifffile
+from skimage.io import imsave
+import logging
+
+logger = logging.getLogger(__name__)
+
+def create_deepcell_mask_overlay(fov_path,
+                                  red_markers,
+                                  green_markers,
+                                  blue_markers=None):
+    """
+    Create a DeepCell overlay mask from single-slice TIFFs in fov_path.
+    Expected file pattern: {marker}.ome.tiff
+    The overlay is saved in the fov_path as overlay_<FOV_ID>.tiff and .png.
+    """
     if blue_markers is None:
         blue_markers = []
 
-    marker_files = glob.glob(os.path.join(fov_path, "*.ome.tiff"))
-    regex = re.compile(r"^(?P<marker>[^.]+)\.ome\.tiff$", re.IGNORECASE)
+    pattern = os.path.join(fov_path, "*.ome.tiff")
+    file_list = glob.glob(pattern)
+    if not file_list:
+        logger.warning(f"No marker files found in {fov_path} for DeepCell mask creation.")
+        return None
 
-    channels = {"red": None, "green": None, "blue": None}
-    for f in marker_files:
-        m = regex.match(os.path.basename(f))
-        if not m:
+    regex = re.compile(r"^(?P<marker>[^.]+)\.ome\.tiff$", re.IGNORECASE)
+    marker_dict = {}
+    for file_path in file_list:
+        file_name = os.path.basename(file_path)
+        m = regex.match(file_name)
+        if m:
+            marker = m.group("marker")
+            marker_dict.setdefault(marker, []).append(file_path)
+        else:
+            logger.info(f"File '{file_name}' does not match expected pattern. Skipping.")
+
+    if not marker_dict:
+        logger.warning(f"No valid marker files found in {fov_path} for DeepCell mask creation.")
+        return None
+
+    red_channel = None
+    green_channel = None
+    blue_channel = None if not blue_markers else None
+
+    def scale_contrast(arr, low=0.5, high=99.5):
+        """Percentile-based scaling to 0–255."""
+        p_low, p_high = np.percentile(arr, (low, high))
+        arr = (arr - p_low) / (p_high - p_low + 1e-6)
+        return np.clip(arr * 255, 0, 255).astype(np.uint8)
+
+    for marker, files in marker_dict.items():
+        marker_img = None
+        for file_path in files:
+            try:
+                img = tifffile.imread(file_path).astype(np.float32)
+            except Exception as e:
+                logger.error(f"Error reading {file_path}: {e}")
+                continue
+            marker_img = img if marker_img is None else marker_img + img
+
+        if marker_img is None:
             continue
-        marker = m.group("marker")
-        img = tifffile.imread(f).astype(np.float32)
+
+        if red_channel is None:
+            H, W = marker_img.shape
+            red_channel = np.zeros((H, W), dtype=np.float32)
+            green_channel = np.zeros((H, W), dtype=np.float32)
+            if blue_markers:
+                blue_channel = np.zeros((H, W), dtype=np.float32)
 
         if marker in red_markers:
-            channels["red"] = img if channels["red"] is None else channels["red"] + img
+            red_channel += marker_img
         elif marker in green_markers:
-            channels["green"] = img if channels["green"] is None else channels["green"] + img
-        elif marker in blue_markers:
-            channels["blue"] = img if channels["blue"] is None else channels["blue"] + img
+            green_channel += marker_img
+        elif blue_markers and marker in blue_markers:
+            blue_channel += marker_img
+        else:
+            logger.debug(f"Marker '{marker}' not assigned to any channel for overlay. Skipping.")
 
-    def clip(img):
-        return np.clip(img, 0, 255).astype(np.uint8)
+    if red_channel is None or green_channel is None:
+        logger.warning(f"Required markers for red and green channels not found in {fov_path}.")
+        return None
 
-    # Red and Green channels are required
-    for key in ["red", "green"]:
-        if channels[key] is None:
-            logger.warning(f"Missing channel: {key} — cannot generate overlay.")
-            return None
+    red_8 = scale_contrast(red_channel)
+    green_8 = scale_contrast(green_channel)
+    blue_8 = scale_contrast(blue_channel) if blue_channel is not None else np.zeros_like(red_8)
 
-    # Fill blue with zeros if missing
-    if channels["blue"] is None:
-        channels["blue"] = np.zeros_like(channels["red"], dtype=np.float32)
-        logger.info("Blue channel missing — filled with zeros.")
+    overlay = np.stack((red_8, green_8, blue_8), axis=-1)
 
-    # Stack RGB channels and write photometric RGB TIFF
-    overlay_rgb = np.stack([
-        clip(channels["red"]),
-        clip(channels["green"]),
-        clip(channels["blue"])
-    ], axis=-1)
-
-    fov_id = os.path.basename(fov_path)
-    overlay_path = os.path.join(fov_path, f"overlay_{fov_id}.tiff")
+    fov_id = os.path.basename(os.path.normpath(fov_path))
+    overlay_tiff = os.path.join(fov_path, f"overlay_{fov_id}.tiff")
+    overlay_png = os.path.join(fov_path, f"overlay_{fov_id}.png")
 
     try:
-        tifffile.imwrite(overlay_path, overlay_rgb, photometric="rgb")
-        logger.info(f"Overlay saved to {overlay_path}")
-        return overlay_path
+        tifffile.imwrite(overlay_tiff, overlay, photometric="rgb")
+        logger.info(f"DeepCell overlay TIFF saved to {overlay_tiff}")
+
+        imsave(overlay_png, overlay)
+        logger.info(f"DeepCell overlay PNG saved to {overlay_png}")
     except Exception as e:
-        logger.error(f"Failed to save RGB overlay TIFF: {e}")
+        logger.error(f"Error saving DeepCell overlay for {fov_path}: {e}")
         return None
+
+    return overlay_tiff
+
 
 
 def safe_get(driver, url, retries=3, delay=5):
@@ -156,6 +211,8 @@ def process_deepcell_overlay(overlay_file, output_dir, deepcell_url, geckodriver
             out_path = os.path.join(output_dir, f"deepcell_mask_{i}.tiff")
             shutil.move(os.path.join(extract_dir, tif_name), out_path)
             logger.info(f"Saved DeepCell result: {out_path}")
+        shutil.rmtree(extract_dir, ignore_errors=True)
+
 
     finally:
         driver.quit()
