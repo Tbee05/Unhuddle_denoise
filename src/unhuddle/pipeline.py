@@ -66,13 +66,18 @@ def process_fov_pipeline(
                     )
                     result["deepcell_processing"] = "Success"
                 except Exception as e:
+                    # Extract first non-empty line of message
+                    err_type = type(e).__name__
+                    err_msg = str(e).splitlines()[0] if str(e).strip() else err_type
                     logger.error(
-                        f"❌ DeepCell processing failed for {os.path.basename(fov_path)}: {e}",
+                        f"❌ DeepCell failed for {os.path.basename(fov_path)}: {err_type} – {err_msg}",
                         exc_info=logger.isEnabledFor(logging.DEBUG)
                     )
-                    result["deepcell_processing"] = f"Error: {e}"
+
+                    result["deepcell_processing"] = f"Error: {err_msg}"
                     return result
-            else:
+
+        else:
                 logger.warning(
                     f"⚠️ Overlay file not created for {os.path.basename(fov_path)} — skipping FOV"
                 )
