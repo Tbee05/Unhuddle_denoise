@@ -203,9 +203,16 @@ def main():
                 logging.error(f"❌ FOV {fov} failed: {e}")
                 results[fov] = {"error": str(e)}
 
-    errored = [os.path.basename(fov) for fov, res in results.items() if "error" in res or "critical_error" in res]
+    errored = [
+        os.path.basename(fov)
+        for fov, res in results.items()
+        if any(k for k in res if "error" in k.lower())
+    ]
+
     successful = [os.path.basename(fov) for fov, res in results.items() if
                   "error" not in res and "critical_error" not in res]
+    if not successful and args.create_deepcell_mask:
+        print("❗ All FOVs failed DeepCell processing. Something may be wrong with DeepCell server or WebDriver.")
 
     if errored:
         print("\n✅ The following FOVs were processed successfully:")
@@ -213,6 +220,10 @@ def main():
 
         print("\n⚠️ Some FOVs encountered errors and may need reprocessing:")
         print("   " + "\n   ".join(errored))
+        for fov in errored:
+            reasons = {k: v for k, v in results[fov].items() if "error" in k.lower()}
+            for err_type, msg in reasons.items():
+                print(f"   ❌ {os.path.basename(fov)}: {err_type} – {msg}")
         print("⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay.png")
 
         print(

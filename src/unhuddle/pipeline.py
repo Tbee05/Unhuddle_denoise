@@ -3,7 +3,7 @@
 import os
 import logging
 logger = logging.getLogger(__name__)
-
+import tqdm
 
 from unhuddle.masks import process_cell_mask, process_nuclear_mask, process_membrane_masks, load_fov_files
 from unhuddle.features import extract_morphology_features, extract_protein_intensity
@@ -68,15 +68,17 @@ def process_fov_pipeline(
                 except Exception as e:
                     # Extract first non-empty line of message
                     err_type = type(e).__name__
-                    err_msg = str(e).splitlines()[0] if str(e).strip() else err_type
+                    msg = str(e).splitlines()[0].strip() or type(e).__name__
+                    suffix = f" – {msg}" if msg else ""
+                    tqdm.write(f"[ERROR] ❌ DeepCell failed for {os.path.basename(fov_path)}: {err_type}{suffix}")
+
                     logger.error(
-                        f"❌ DeepCell failed for {os.path.basename(fov_path)}: {err_type} – {err_msg}",
+                        f"DeepCell failure for {fov_path}: {e}",
                         exc_info=logger.isEnabledFor(logging.DEBUG)
                     )
+                    result["deepcell_processing"] = f"Error: {msg}"
 
-                    result["deepcell_processing"] = f"Error: {err_msg}"
                     return result
-
         else:
                 logger.warning(
                     f"⚠️ Overlay file not created for {os.path.basename(fov_path)} — skipping FOV"
