@@ -209,33 +209,19 @@ def main():
                     "crashed": True  # Optional: for analytics/debug
                 }
 
-    errored = [
-        os.path.basename(fov)
-        for fov, res in results.items()
-        if any("error" in k.lower() or "deepcell" in k.lower() and "Error" in str(v) for k, v in res.items())
-    ]
-
-    successful = [os.path.basename(fov) for fov, res in results.items() if
-                  "error" not in res and "critical_error" not in res]
+    def is_result_failed(res):
+        return any(
+            "error" in k.lower()
+            or ("deepcell" in k.lower() and "error" in str(v).lower())
+            for k, v in res.items()
+        )
+    errored = [os.path.basename(fov) for fov, res in results.items() if is_result_failed(res)]
+    successful = [os.path.basename(fov) for fov, res in results.items() if not is_result_failed(res)]
 
     if errored:
-        print("\n✅ The following FOVs were processed successfully:")
-        print("   " + "\n   ".join(successful))
-
-        print("\n⚠️ Some FOVs encountered errors and may need reprocessing:")
-        print("   " + "\n   ".join(errored))
+        print("\n⚠️ Some FOVs failed:")
         for fov in errored:
-            if fov not in results:
-                print(f"   ❌ {fov}: unknown error (no result returned)")
-                continue
-            reasons = {
-                k: v for k, v in results[fov].items()
-                if "error" in k.lower() or (k.lower().startswith("deepcell") and "Error" in str(v))
-            }
-            if not reasons:
-                print(f"   ❌ {fov}: unknown error (no error key in result)")
-            for err_type, msg in reasons.items():
-                print(f"   ❌ {os.path.basename(fov)}: {err_type} – {msg}")
+            print(f"   ❌ {os.path.basename(fov)}")
 
         print("⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay.png")
 
