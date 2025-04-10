@@ -68,23 +68,23 @@ def process_fov_pipeline(
                 except Exception as e:
                     logger.error(
                         f"❌ DeepCell processing failed for {os.path.basename(fov_path)}: {e}",
-                        exc_info=verbose
+                        exc_info=logger.isEnabledFor(logging.DEBUG)
                     )
                     result["deepcell_processing"] = f"Error: {e}"
-                    return result  # 💡 Immediately return on DeepCell failure
+                    return result
             else:
-                result["deepcell_processing"] = "Overlay file not created"
                 logger.warning(
                     f"⚠️ Overlay file not created for {os.path.basename(fov_path)} — skipping FOV"
                 )
-                return result  # 💡 Skip this FOV too if overlay is missing
+                result["deepcell_processing"] = "Overlay file not created"
+                return result
 
         try:
             files = load_fov_files(fov_path, nuclear_markers, mask_pattern)
         except ValueError as ve:
             logger.error(
                 f"⚠️ Mask loading failed for {os.path.basename(fov_path)}: {ve}",
-                exc_info=verbose
+                exc_info=logger.isEnabledFor(logging.DEBUG)
             )
             result["critical_error"] = f"Mask load error: {ve}"
             return result
@@ -100,7 +100,7 @@ def process_fov_pipeline(
     except Exception as e:
         logger.error(
             f"💥 Unexpected error during mask creation for {os.path.basename(fov_path)}: {e}",
-            exc_info=verbose
+            exc_info=logger.isEnabledFor(logging.DEBUG)
         )
         result["critical_error"] = f"Mask creation failed: {e}"
         return result
