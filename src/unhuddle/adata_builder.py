@@ -117,7 +117,7 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
             adata.uns["spatial"][fov] = {"segmentation": imread(mask_path)}
 
     adata.write_h5ad(adata_output_path)
-    print(f"AnnData saved to: {adata_output_path}")
+    print(f"AnnData saved to: {adata_output_path}\n\n")
 
     # QC plot
     data = adata.obs["summed_intensity"]
