@@ -215,27 +215,38 @@ def main():
             or ("deepcell" in k.lower() and "error" in str(v).lower())
             for k, v in res.items()
         )
+
     errored = [os.path.basename(fov) for fov, res in results.items() if is_result_failed(res)]
     successful = [os.path.basename(fov) for fov, res in results.items() if not is_result_failed(res)]
 
-    if errored:
-        print("\n⚠️ Some FOVs failed:")
+    print()  # spacing after tqdm
+
+    if len(successful) == 0 and len(errored) > 0:
+        # ❗ All failed
+        print("❗ All FOVs failed. If overlay exist (basepath/{fov}/overlay.png):")
+        print("Please check DeepCell server, geckodriver path.")
+
+
+    elif errored:
+        # ⚠️ Partial failures
+        print("⚠️ Some FOVs failed:")
         for fov in errored:
             print(f"   ❌ {os.path.basename(fov)}")
+        print("⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay.png\n")
 
-        print("⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay.png")
+        if successful:
+            print("✅ The following FOVs were processed successfully:")
+            for fov in successful:
+                print(f"   {fov}")
+            print()
 
+    if successful:
+        # ✅ Show outputs if anything succeeded
         print(
-            "\n📁 Processed FOV folders have updated masks and overlays — check the pseudocolored mask renders for validation.")
+            "📁 Processed FOV folders have updated masks and overlays — check the pseudocolored mask renders for validation.")
         print(f"📄 Unhuddle normalized output (partial): {dirs['unhuddle_norm']}")
         print(f"📄 Cell-level morphology metrics: {dirs['morph']}")
         print(f"📄 Raw/pre-normalization values: {out}\n")
-    else:
-        print("\n✅ All FOVs processed successfully.")
-        print("📁 FOV folders updated with masks and overlays — tip: inspect pseudocolored mask renders.")
-        print(f"📄 Unhuddle normalized is ready for phenotyping: {dirs['unhuddle_norm']}")
-        print(f"📄 Cell-level morphology metrics: {dirs['morph']}")
-        print(f"📄 Values before Unhuddle correction and/or before normalization: {out}\n")
 
     # --- Optional: Create adata object ---
     if args.create_adata:
