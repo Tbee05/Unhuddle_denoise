@@ -115,8 +115,8 @@ def create_deepcell_mask_overlay(fov_path,
     overlay = np.stack((red_8, green_8, blue_8), axis=-1)
 
     fov_id = os.path.basename(os.path.normpath(fov_path))
-    overlay_tiff = os.path.join(fov_path, f"overlay_{fov_id}.tiff")
-    overlay_png = os.path.join(fov_path, f"overlay_{fov_id}.png")
+    overlay_tiff = os.path.join(fov_path, f"overlay.tiff")
+    overlay_png = os.path.join(fov_path, f"overlay.png")
 
     try:
         tifffile.imwrite(overlay_tiff, overlay, photometric="rgb")

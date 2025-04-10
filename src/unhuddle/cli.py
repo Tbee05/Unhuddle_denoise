@@ -213,7 +213,7 @@ def main():
 
         print("\n⚠️ Some FOVs encountered errors and may need reprocessing:")
         print("   " + "\n   ".join(errored))
-        print("\n⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay_{fov}.png")
+        print("⚠️ Tip: inspect overlay (if exist) basepath/{fov}/overlay.png")
 
         print(
             "\n📁 Processed FOV folders have updated masks and overlays — check the pseudocolored mask renders for validation.")
