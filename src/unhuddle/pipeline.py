@@ -3,7 +3,6 @@
 import os
 import logging
 logger = logging.getLogger(__name__)
-from tqdm import tqdm
 
 from unhuddle.masks import process_cell_mask, process_nuclear_mask, process_membrane_masks, load_fov_files
 from unhuddle.features import extract_morphology_features, extract_protein_intensity
@@ -66,18 +65,17 @@ def process_fov_pipeline(
                     )
                     result["deepcell_processing"] = "Success"
                 except Exception as e:
-                    # Extract first non-empty line of message
                     err_type = type(e).__name__
-                    msg = str(e).splitlines()[0].strip() or type(e).__name__
-                    suffix = f" – {msg}" if msg else ""
-                    tqdm.write(f"[ERROR] ❌ DeepCell failed for {os.path.basename(fov_path)}: {err_type}{suffix}")
+                    lines = str(e).splitlines()
+                    first_meaningful = next((line.strip() for line in lines if line.strip()), err_type)
+                    short_msg = f"{err_type} – {first_meaningful}"
 
-                    logger.error(
-                        f"DeepCell failure for {fov_path}: {e}",
-                        exc_info=logger.isEnabledFor(logging.DEBUG)
-                    )
-                    result["deepcell_processing"] = f"Error: {msg}"
+                    # Clean, single log line to tqdm only
+                    from tqdm import tqdm as tq
+                    tq.write(f"[ERROR] ❌ DeepCell failed for {os.path.basename(fov_path)}: {short_msg}")
 
+                    # Save to result (optional: keep full repr(e))
+                    result["deepcell_processing"] = f"Error: {short_msg}"
                     return result
         else:
                 logger.warning(

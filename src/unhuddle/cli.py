@@ -206,13 +206,11 @@ def main():
     errored = [
         os.path.basename(fov)
         for fov, res in results.items()
-        if any(k for k in res if "error" in k.lower())
+        if any("error" in k.lower() or "deepcell" in k.lower() and "Error" in str(v) for k, v in res.items())
     ]
 
     successful = [os.path.basename(fov) for fov, res in results.items() if
                   "error" not in res and "critical_error" not in res]
-    if not successful and args.create_deepcell_mask:
-        print("❗ All FOVs failed DeepCell processing. Something may be wrong with DeepCell server or WebDriver.")
 
     if errored:
         print("\n✅ The following FOVs were processed successfully:")
