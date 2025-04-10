@@ -57,26 +57,50 @@ def process_fov_pipeline(
             result["deepcell_overlay_file"] = overlay_file
             if overlay_file:
                 try:
-                    process_deepcell_overlay(overlay_file, fov_path, deepcell_url, geckodriver_path, deepcell_resolution)
+                    process_deepcell_overlay(
+                        overlay_file,
+                        fov_path,
+                        deepcell_url,
+                        geckodriver_path,
+                        deepcell_resolution
+                    )
                     result["deepcell_processing"] = "Success"
                 except Exception as e:
-                    logger.error(f"DeepCell processing failed for {fov_path}: {e}")
+                    logger.error(
+                        f"❌ DeepCell processing failed for {os.path.basename(fov_path)}: {e}",
+                        exc_info=verbose
+                    )
                     result["deepcell_processing"] = f"Error: {e}"
+                    return result  # 💡 Immediately return on DeepCell failure
             else:
                 result["deepcell_processing"] = "Overlay file not created"
+                logger.warning(
+                    f"⚠️ Overlay file not created for {os.path.basename(fov_path)} — skipping FOV"
+                )
+                return result  # 💡 Skip this FOV too if overlay is missing
 
-        files = load_fov_files(fov_path, nuclear_markers, mask_pattern)
+        try:
+            files = load_fov_files(fov_path, nuclear_markers, mask_pattern)
+        except ValueError as ve:
+            logger.error(
+                f"⚠️ Mask loading failed for {os.path.basename(fov_path)}: {ve}",
+                exc_info=verbose
+            )
+            result["critical_error"] = f"Mask load error: {ve}"
+            return result
 
         cell_mask = process_cell_mask(fov_path, files["mask"])
+
         if create_nuclear_mask:
             nuclear_mask = process_nuclear_mask(fov_path, cell_mask, files, nuclear_markers)
         else:
             nuclear_mask = None
             logger.info("Skipping nuclear mask creation as per flag.")
+
     except Exception as e:
         logger.error(
-            f"An unexpected error occurred during mask creation for {fov_path}: {e}, skipping this FOV",
-            exc_info=True  # ✅ show traceback in logs
+            f"💥 Unexpected error during mask creation for {os.path.basename(fov_path)}: {e}",
+            exc_info=verbose
         )
         result["critical_error"] = f"Mask creation failed: {e}"
         return result
