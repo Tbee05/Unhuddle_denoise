@@ -223,8 +223,7 @@ def main():
 
     if len(successful) == 0 and len(errored) > 0:
         # ❗ All failed
-        print("❗ All FOVs failed. If overlay exist (basepath/{fov}/overlay.png):")
-        print("Please check DeepCell server, geckodriver path.")
+        print("❗ All FOVs failed. If overlay exist (basepath/{fov}/overlay.png) and looks good: Please check DeepCell server, geckodriver path.")
 
 
     elif errored:
