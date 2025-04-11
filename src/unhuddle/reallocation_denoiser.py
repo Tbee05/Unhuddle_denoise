@@ -9,23 +9,44 @@ warnings.filterwarnings("ignore", message=".*partition.*MaskedArray.*")
 
 
 def run_denoising_pipeline_on_dataframe(
-    df: pd.DataFrame,
-    markers: list[str],
-    area_col: str = "Area",
-    layer_suffix: str = "_ExclusionMembrane_Sum_Intensity",
-    signal_anchor_x: float = 15,
-    signal_anchor_y: float = 0,
-    gridsize: int = 100,
-    density_quantile: float = 0.1,
-    min_cells_per_bin: int = 10,
-    min_area: float = 15,
-    store_metadata: bool = False,
+        df: pd.DataFrame,
+        markers: list[str],
+        area_col: str = "Area",
+        layer_suffix: str = "_ExclusionMembrane_Sum_Intensity",
+        signal_anchor_x: float = 15,
+        signal_anchor_y: float = 0,
+        gridsize: int = 100,
+        density_quantile: float = 0.1,
+        min_cells_per_bin: int = 10,
+        min_area: float = 15,
+        store_metadata: bool = False,
 ) -> pd.DataFrame:
     """
     Adds denoised values for each marker into a DataFrame based on signal/noise cone fitting.
+
     Area values < `min_area` are clipped instead of excluded.
-    Negative residuals are clipped to zero before final area regression.
+
+    NEW LOGIC:
+      - Once the computed residual (i.e. intensity minus fitted signal and noise contributions)
+        drops to or below 0, we mask it from further operations (such as area bias regression and robust normalization)
+        and keep it as 0 in the final output.
+
+    Parameters:
+      df: Input DataFrame with area and intensity values.
+      markers: List of marker names.
+      area_col: Column name for the area.
+      layer_suffix: Suffix appended to each marker to obtain the intensity column.
+      signal_anchor_x, signal_anchor_y: Anchors for the signal fitting line.
+      gridsize: Grid size for hexbin used in apex inference.
+      density_quantile: Quantile cutoff for density filtering.
+      min_cells_per_bin: Minimum number of cells per bin to be considered.
+      min_area: Minimum area threshold; values below this are clipped.
+      store_metadata: If True, returns regression and fitting metadata.
+
+    Returns:
+      DataFrame with additional columns for denoised intensity values and, optionally, a metadata dictionary.
     """
+    # Clip the area values at the minimum threshold.
     area = np.clip(df[area_col].values, min_area, None)
     denoised_df = df.copy()
     metadata = {}
@@ -35,16 +56,16 @@ def run_denoising_pipeline_on_dataframe(
         if intensity_col not in df.columns:
             continue
 
-        intensity = df[intensity_col].values
-        intensity = intensity.astype(np.float64)
+        # Convert intensity to float64 for precision.
+        intensity = df[intensity_col].values.astype(np.float64)
 
-        # Filter area >= min_area for apex inference only
+        # Filter for area values >= min_area for the apex inference.
         area_filt = area[area >= min_area]
         intensity_filt = intensity[area >= min_area]
 
+        # Infer apex parameters via a hexbin plot (using log-binning of counts).
         hb = plt.hexbin(area_filt, intensity_filt, gridsize=gridsize, bins='log', cmap='Greys')
         plt.close()
-
         counts = hb.get_array()
         xbins = hb.get_offsets()[:, 0]
         ybins = hb.get_offsets()[:, 1]
@@ -60,58 +81,83 @@ def run_denoising_pipeline_on_dataframe(
         apex_area = top_x[peak_idx]
         apex_intensity = top_y[peak_idx]
 
+        # Fit the signal using the apex and provided anchor point.
         signal_slope = (apex_intensity - signal_anchor_y) / (apex_area - signal_anchor_x)
         signal_intercept = signal_anchor_y - signal_slope * signal_anchor_x
         signal_fit = signal_slope * area + signal_intercept
 
+        # Infer the noise slope from hexbin bins above the apex.
         noise_mask = (xbins > apex_area) & (counts > density_thresh) & (counts >= min_cells_per_bin)
         if np.any(noise_mask):
             X_noise = xbins[noise_mask].reshape(-1, 1)
             y_noise = ybins[noise_mask]
-            X_noise_rel = X_noise - apex_area
-            model = LinearRegression(fit_intercept=False).fit(X_noise_rel, y_noise)
-            noise_slope = model.coef_[0]
+            X_noise_rel = X_noise - apex_area  # relative to the apex area
+            noise_model = LinearRegression(fit_intercept=False).fit(X_noise_rel, y_noise)
+            noise_slope = noise_model.coef_[0]
         else:
-            noise_slope = 0.02
+            noise_slope = 0.02  # default fallback value
 
         noise_fit = np.where(area > apex_area, noise_slope * (area - apex_area), 0)
 
+        # Prepare the model input by stacking the signal and noise fits.
         X = np.stack([signal_fit, noise_fit], axis=1)
         valid_mask = ~np.isnan(X).any(axis=1) & ~np.isnan(intensity)
         X_clean = X[valid_mask]
         y_clean = intensity[valid_mask]
 
+        # Fit the full model (signal + noise) to the intensity.
         full_model = LinearRegression().fit(X_clean, y_clean)
         alpha, beta = full_model.coef_
         intercept_model = full_model.intercept_
 
         signal_contrib = alpha * signal_fit
         noise_contrib = beta * noise_fit
+
+        # Compute residuals after subtracting the model contributions.
         residuals = intensity - (signal_contrib + noise_contrib + intercept_model)
 
-        # Clip negative residuals before area normalization
+        # Clip any negative residuals to 0.
         residuals_clipped = np.clip(residuals, 0, None)
 
-        # Final regression to remove residual area bias
-        valid_res = ~np.isnan(residuals_clipped)
-        X_area = area[valid_res].reshape(-1, 1)
-        y_res = residuals_clipped[valid_res]
+        # ---- New Masking Logic for Residuals ----
+        # Identify positions where the residual is positive.
+        positive_mask = residuals_clipped > 0
 
-        area_model = LinearRegression().fit(X_area, y_res)
-        gamma = area_model.coef_[0]
-        intercept_area = area_model.intercept_
+        # Perform area regression only on the positive residuals.
+        if np.any(positive_mask):
+            X_area = area[positive_mask].reshape(-1, 1)
+            y_res = residuals_clipped[positive_mask]
+            area_model = LinearRegression().fit(X_area, y_res)
+            gamma = area_model.coef_[0]
+            intercept_area = area_model.intercept_
 
-        # Remove area-dependent baseline
-        final_denoised = residuals_clipped - (gamma * area + intercept_area)
-
-        # Robust normalization: clip outliers and scale to [0, 1]
-        vmin, vmax = np.percentile(final_denoised[~np.isnan(final_denoised)], [2, 98])
-        if vmax > vmin:
-            final_denoised = np.clip((final_denoised - vmin) / (vmax - vmin), 0, 1)
+            # Compute the final residual after subtracting area-dependent bias.
+            computed_final_denoised = np.zeros_like(residuals_clipped)
+            computed_final_denoised[positive_mask] = (
+                    residuals_clipped[positive_mask] - (gamma * area[positive_mask] + intercept_area)
+            )
+            computed_final_denoised = np.clip(computed_final_denoised, 0, None)
         else:
-            final_denoised = np.zeros_like(final_denoised)
+            computed_final_denoised = np.zeros_like(residuals_clipped)
+            gamma = np.nan
+            intercept_area = np.nan
 
-        denoised_df[f"{marker}_ExclusionMembrane_Denoised_Intensity"] = residuals
+        # Apply robust normalization only on the positive (unmasked) values.
+        final_denoised = np.zeros_like(computed_final_denoised)
+        positive_norm_mask = computed_final_denoised > 0
+        if np.any(positive_norm_mask):
+            # Compute the 2nd and 98th percentiles on unmasked values.
+            vmin, vmax = np.percentile(computed_final_denoised[positive_norm_mask], [2, 98])
+            if vmax > vmin:
+                norm_values = np.clip(
+                    (computed_final_denoised[positive_norm_mask] - vmin) / (vmax - vmin), 0, 1
+                )
+            else:
+                norm_values = np.zeros_like(computed_final_denoised[positive_norm_mask])
+            final_denoised[positive_norm_mask] = norm_values
+
+        # Save the intermediate (post-clipping) and final denoised intensities.
+        denoised_df[f"{marker}_ExclusionMembrane_Denoised_Intensity"] = residuals_clipped
         denoised_df[f"{marker}_ExclusionMembrane_FinalDenoised_Intensity"] = final_denoised
 
         if store_metadata:
@@ -148,10 +194,11 @@ def compute_denoised_reallocation_factors(protein_csv_paths, protein_features_di
 
             if "Area" not in morph_df.columns:
                 raise ValueError(f"'Area' column missing in {morph_path}")
-            fov_name = os.path.splitext(os.path.basename(protein_path))[0]
 
+            fov_name = os.path.splitext(os.path.basename(protein_path))[0]
             joint_df = morph_df[["Area"]].join(protein_df, how="inner")
             joint_df["fov"] = fov_name
+
             all_fovs_data.append(joint_df)
             fov_ids.append(fov_name)
 
@@ -171,7 +218,10 @@ def compute_denoised_reallocation_factors(protein_csv_paths, protein_features_di
     denoised_df = run_denoising_pipeline_on_dataframe(full_df, markers)
 
     for fov_name, group in denoised_df.groupby("fov"):
-        denoised_cols = [col for col in group.columns if col.endswith("_ExclusionMembrane_Denoised_Intensity") or col.endswith("_ExclusionMembrane_FinalDenoised_Intensity")]
+        denoised_cols = [
+            col for col in group.columns
+            if col.endswith("_ExclusionMembrane_Denoised_Intensity") or col.endswith("_ExclusionMembrane_FinalDenoised_Intensity")
+        ]
         denoised_block = group[denoised_cols].reset_index(drop=True)
 
         protein_csv_path = os.path.join(protein_features_dir, f"{fov_name}.csv")
@@ -181,8 +231,17 @@ def compute_denoised_reallocation_factors(protein_csv_paths, protein_features_di
 
         try:
             protein_df = pd.read_csv(protein_csv_path)
-            updated_df = pd.concat([protein_df, denoised_block], axis=1)
+
+            # Drop old denoised columns if they exist
+            cols_to_drop = [col for col in protein_df.columns if col in denoised_block.columns]
+            if cols_to_drop:
+                logger.debug(f"🧹 Overwriting existing denoised columns for FOV '{fov_name}': {cols_to_drop}")
+                protein_df.drop(columns=cols_to_drop, inplace=True)
+
+            updated_df = pd.concat([protein_df.reset_index(drop=True), denoised_block], axis=1)
             updated_df.to_csv(protein_csv_path, index=False)
-            logger.info(f"📝 Appended denoised values to protein CSV for FOV: {fov_name}")
+
+            logger.info(f"📝 Denoised values updated in protein CSV for FOV: {fov_name}")
+
         except Exception as e:
             logger.error(f"❌ Failed to update {protein_csv_path}: {e}")

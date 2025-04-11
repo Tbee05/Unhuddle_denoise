@@ -15,20 +15,24 @@ from unhuddle.cli_helpers import (
     result_failed,
     create_adata
 )
-from unhuddle.pipeline import process_fov_features_only, process_fov_reallocation_only
 
+# These must remain top-level for multiprocessing compatibility
 def process_features(fov, dirs, args):
+    from unhuddle.pipeline import process_fov_features_only
     return process_fov_features_only(*build_feature_args(fov, dirs, args))
 
 def process_reallocation(fov, dirs, args):
+    from unhuddle.pipeline import process_fov_reallocation_only
     return process_fov_reallocation_only(*build_reallocation_args(fov, dirs, args))
 
 def main():
     args = parse_arguments()
     setup_logging(args.log_level)
-    logger = logging.getLogger("unhuddle")
-    logger.debug(f"Logger '{logger.name}' is active at level: {logger.level}")
 
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Logger '{logger.name}' is active at level: {logging.getLevelName(logger.getEffectiveLevel())}")
+
+    # Basic CLI validation
     if args.list_available_markers:
         list_available_markers(args)
         return
@@ -41,15 +45,16 @@ def main():
 
     if args.nuclear_markers_overlay is None:
         args.nuclear_markers_overlay = args.nuclear_markers
-    logging.info(f"Using nuclear_markers_overlay: {args.nuclear_markers_overlay}")
+    logger.info(f"Using nuclear_markers_overlay: {args.nuclear_markers_overlay}")
 
     if args.membrane_markers_overlay is None:
         args.membrane_markers_overlay = args.normalisation_markers
-    logging.info(f"Using membrane_markers_overlay: {args.membrane_markers_overlay}")
+    logger.info(f"Using membrane_markers_overlay: {args.membrane_markers_overlay}")
 
     if args.use_denoised:
-        logging.info("⚙️ Percentile normalization enabled — cohort-level ExclMem_Sum data will be fetched before FOV loop.")
+        logger.info("⚙️ Percentile normalization enabled — cohort-level ExclMem_Sum data will be fetched before FOV loop.")
 
+    # Setup paths and input FOVs
     dirs = setup_output_directories(args.output_base_path)
     fov_folders = get_fov_folders(args, dirs)
 
@@ -65,9 +70,10 @@ def main():
         description="🔬 Extracting Features"
     )
 
-    # Step 2. Denoise reallocation factors
+    # Stage 2a: Denoising (cohort-level)
     if args.use_denoised:
-        logging.info("📊 Computing denoised reallocation factors (cohort-wide) ...")
+        logger.info("📊 Computing denoised reallocation factors (cohort-wide) ...")
+        from unhuddle.reallocation_denoiser import compute_denoised_reallocation_factors
 
         protein_csv_paths = [
             os.path.join(dirs["protein"], f)
@@ -75,17 +81,14 @@ def main():
             if f.endswith(".csv")
         ]
 
-        from unhuddle.reallocation_denoiser import compute_denoised_reallocation_factors
-
         denoised_summary_path = os.path.join(dirs["metadata_denoised"], "denoised_reallocation_summary.csv")
         compute_denoised_reallocation_factors(
             protein_csv_paths=protein_csv_paths,
             protein_features_dir=dirs["protein"]
         )
+        logger.info(f"✅ Denoised reallocation factors saved to: {denoised_summary_path}")
 
-        logging.info(f"✅ Denoised reallocation factors saved to: {denoised_summary_path}")
-
-    # Stage 2: Reallocation and Normalization
+    # Stage 2b: Reallocation + Normalization
     results_stage2 = run_parallel_stage(
         fov_folders,
         func=partial(process_reallocation, dirs=dirs, args=args),
@@ -100,6 +103,7 @@ def main():
         print(f"📄 Cell-level morphology metrics: {dirs['morph']}")
         print(f"📄 Raw/pre-normalization values: {args.output_base_path}\n")
 
+    # Optional: build AnnData
     if args.create_adata:
         create_adata(args)
 

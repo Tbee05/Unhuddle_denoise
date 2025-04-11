@@ -6,32 +6,73 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
 from tqdm import tqdm
 
+
+_LOGGING_INITIALIZED = False
+
 def setup_logging(log_level: str) -> None:
     """
     Set up logging with the specified log level and enable detailed logging for key libraries when in DEBUG.
+    Prevents reinitialization across FOV loop calls.
     """
+    global _LOGGING_INITIALIZED
+    if _LOGGING_INITIALIZED:
+        return
+
     level = getattr(logging, log_level.upper(), logging.INFO)
+
+    # Force root logger config
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         force=True
     )
+
+    # Ensure root logger has at least one handler
+    root = logging.getLogger()
+    if not root.handlers:
+        stream = logging.StreamHandler()
+        stream.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+        root.addHandler(stream)
+    root.setLevel(level)
+
+    # Propagate and configure all 'unhuddle.*' loggers
+    for name in logging.root.manager.loggerDict:
+        if name.startswith("unhuddle"):
+            logger = logging.getLogger(name)
+            logger.setLevel(level)
+            logger.propagate = True
+
     logger = logging.getLogger(__name__)
-    logger.debug("Logging has been set up")
+    logger.debug("🛠️ Logging system has been initialized")
+
+    # Print summary of logger levels (optional diagnostics)
+    for name in sorted(logging.root.manager.loggerDict):
+        l = logging.getLogger(name)
+        logger.debug(f"{name:40} level={logging.getLevelName(l.level)}")
 
     if level == logging.DEBUG:
-        # Enable verbose logging for key third-party libraries
         noisy_libs = [
-            "selenium",
-            "urllib3",
-            "httpcore",
+            "selenium", "urllib3", "httpcore",
             "selenium.webdriver.remote.remote_connection"
         ]
         for lib in noisy_libs:
             lib_logger = logging.getLogger(lib)
             lib_logger.setLevel(logging.DEBUG)
-            lib_logger.propagate = True  # ensure logs reach root handlers
-        logger.debug("Verbose logging enabled for Selenium and network libraries")
+            lib_logger.propagate = True
+
+        # 🔇 Suppress matplotlib & PIL debug logs
+        for noisy in [
+            "matplotlib", "matplotlib.font_manager",
+            "matplotlib.pyplot", "PIL", "PIL.Image"
+        ]:
+            lib_logger = logging.getLogger(noisy)
+            lib_logger.setLevel(logging.WARNING)
+            lib_logger.propagate = False
+
+        logger.debug("📡 Verbose logging enabled for Selenium and network libraries (matplotlib and PIL suppressed)")
+
+    _LOGGING_INITIALIZED = True
+
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -134,6 +175,8 @@ def setup_output_directories(output_base: str) -> dict:
         "original_norm": os.path.join(output_base, "original_normalized"),
         "unhuddle_sum": os.path.join(output_base, "unhuddle_sum"),
         "unhuddle_norm": os.path.join(output_base, "unhuddle_normalized"),
+        "unhuddle_denoised_sum": os.path.join(output_base, "unhuddle_denoised_sum"),
+        "unhuddle_denoised_norm": os.path.join(output_base, "unhuddle_denoised_normalized"),
         "metadata_denoised": os.path.join(output_base, "metadata_denoise"),
         "adata": os.path.join(output_base, "adata_objects")
     }
@@ -257,26 +300,25 @@ def build_feature_args(fov: str, dirs: dict, args: argparse.Namespace):
 
 
 def build_reallocation_args(fov: str, dirs: dict, args: argparse.Namespace):
-    morph_path = os.path.join(dirs["morph"], f"{os.path.basename(fov)}.csv")
     protein_path = os.path.join(dirs["protein"], f"{os.path.basename(fov)}.csv")
 
-    morph_df = pd.read_csv(morph_path)
     protein_df = pd.read_csv(protein_path)
 
-    morph_features = {"mask": None, "membrane_mask": None}
 
     return (
         fov,
-        morph_features,
         protein_df,
         dirs["original_sum"],
         dirs["original_norm"],
         dirs["unhuddle_sum"],
         dirs["unhuddle_norm"],
+        dirs["unhuddle_denoised_sum"],
+        dirs["unhuddle_denoised_norm"],
         args.normalisation_markers,
         args.use_denoised,
         args.log_level
     )
+
 
 
 
