@@ -1,5 +1,5 @@
 [project]
-name = "unhuddle"
+name = "unhuddle-denoise"
 version = "0.1.0"
 description = "Highly multiplex proteomics: Signal deconvolution and normalization in densely packed tissue using UNHUDDLE."
 authors = [
@@ -9,7 +9,6 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 
-# Core dependencies
 dependencies = [
   "numpy",
   "pandas",
@@ -35,9 +34,8 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [project.scripts]
-unhuddle = "unhuddle.cli:main"
+unhuddle-denoise = "unhuddle_denoise.cli:main"  # new entry point
 
-# Optional: Dev dependencies (install via `pip install .[dev]`)
 [project.optional-dependencies]
 dev = [
   "pytest",
@@ -46,7 +44,6 @@ dev = [
   "isort"
 ]
 
-# Optional formatting/linting config
 [tool.black]
 line-length = 100
 target-version = ["py38"]
