@@ -84,14 +84,31 @@ def integrate_intensities_for_interactions(fov_folder, interactions):
 
     return interactions
 
-def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
+from collections import defaultdict
+
+def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6, use_denoised=True, ):
+    logger = logging.getLogger("unhuddle")
     logger.info("Reallocating intensities...")
 
-    mean_intensity = {
-        (row["Label"], col.replace("_ExclusionMembrane_Mean_Intensity", "")): row[col]
-        for _, row in protein_features.iterrows()
-        for col in row.index if col.endswith("_ExclusionMembrane_Mean_Intensity")
-    }
+    # Prepare denoised + mean intensities
+    denoised_intensity = {}
+    mean_intensity = {}
+
+    for _, row in protein_features.iterrows():
+        for col in row.index:
+            if col.endswith("_ExclusionMembrane_FinalDenoised_Intensity"):
+                marker = col.replace("_ExclusionMembrane_FinalDenoised_Intensity", "")
+                denoised_intensity[(row["Label"], marker)] = row[col]
+            elif col.endswith("_ExclusionMembrane_Mean_Intensity"):
+                marker = col.replace("_ExclusionMembrane_Mean_Intensity", "")
+                mean_intensity[(row["Label"], marker)] = row[col]
+
+    def get_marker_intensity(label, marker):
+        if use_denoised:
+            return denoised_intensity.get((label, marker),
+                   mean_intensity.get((label, marker), 0.0))
+        else:
+            return mean_intensity.get((label, marker), 0.0)
 
     reallocation = defaultdict(lambda: {
         "taken_intensity": defaultdict(float),
@@ -101,6 +118,7 @@ def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
     for coord, data in interactions.items():
         if "intensities" not in data:
             continue
+
         interaction_type = data["type"]
         markers = [m for m in data["intensities"].keys() if "DNA" not in m and "Histone" not in m]
         coords = [coord]
@@ -109,18 +127,15 @@ def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
             current = data["current"]
             neighbors = data["neighbors"]
             involved = [current] + neighbors
-        else:  # background
+        else:
             involved = data["interacts_with"]
 
         for marker in markers:
             values = [interactions[c]["intensities"].get(marker, 0.0) for c in coords]
             total = sum(values)
-            weights = []
-            for i in involved:
-                val = mean_intensity.get((i, marker), 0.0)
-                weights.append(max(val, 0))
-
+            weights = [max(get_marker_intensity(i, marker), 0) for i in involved]
             denom = sum(weights)
+
             if denom > 0:
                 for i, w in zip(involved, weights):
                     frac = w / denom
@@ -131,6 +146,7 @@ def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6):
                 if interaction_type == "border":
                     reallocation[current]["reallocated_intensity"][marker] += total
                     reallocation[current]["taken_intensity"][marker] += total
+
     return reallocation
 
 
