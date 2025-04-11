@@ -4,6 +4,8 @@ import numpy as np
 import logging
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+import warnings
+warnings.filterwarnings("ignore", message=".*partition.*MaskedArray.*")
 
 
 def run_denoising_pipeline_on_dataframe(
@@ -94,10 +96,20 @@ def run_denoising_pipeline_on_dataframe(
         valid_res = ~np.isnan(residuals_clipped)
         X_area = area[valid_res].reshape(-1, 1)
         y_res = residuals_clipped[valid_res]
+
         area_model = LinearRegression().fit(X_area, y_res)
         gamma = area_model.coef_[0]
         intercept_area = area_model.intercept_
+
+        # Remove area-dependent baseline
         final_denoised = residuals_clipped - (gamma * area + intercept_area)
+
+        # Robust normalization: clip outliers and scale to [0, 1]
+        vmin, vmax = np.percentile(final_denoised[~np.isnan(final_denoised)], [2, 98])
+        if vmax > vmin:
+            final_denoised = np.clip((final_denoised - vmin) / (vmax - vmin), 0, 1)
+        else:
+            final_denoised = np.zeros_like(final_denoised)
 
         denoised_df[f"{marker}_ExclusionMembrane_Denoised_Intensity"] = residuals
         denoised_df[f"{marker}_ExclusionMembrane_FinalDenoised_Intensity"] = final_denoised
@@ -136,7 +148,6 @@ def compute_denoised_reallocation_factors(protein_csv_paths, protein_features_di
 
             if "Area" not in morph_df.columns:
                 raise ValueError(f"'Area' column missing in {morph_path}")
-
             fov_name = os.path.splitext(os.path.basename(protein_path))[0]
 
             joint_df = morph_df[["Area"]].join(protein_df, how="inner")

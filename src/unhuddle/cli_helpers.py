@@ -134,6 +134,7 @@ def setup_output_directories(output_base: str) -> dict:
         "original_norm": os.path.join(output_base, "original_normalized"),
         "unhuddle_sum": os.path.join(output_base, "unhuddle_sum"),
         "unhuddle_norm": os.path.join(output_base, "unhuddle_normalized"),
+        "metadata_denoised": os.path.join(output_base, "metadata_denoise"),
         "adata": os.path.join(output_base, "adata_objects")
     }
     for directory in dirs.values():
@@ -201,6 +202,17 @@ def summarize_results(results: dict, stage_description: str = "") -> None:
         print("✅ All FOVs processed successfully.")
     print("=" * 40 + "\n")
 
+from functools import partial
+
+def dispatch_stage(fov_folders, process_fn, arg_builder_fn, args, dirs, description, max_workers):
+    process = partial(process_fn, dirs=dirs, args=args)
+    results = run_parallel_stage(
+        fov_folders,
+        func=lambda fov: process(fov),
+        max_workers=max_workers,
+        description=description
+    )
+    return results
 
 def run_parallel_stage(fov_folders: list, func, max_workers: int, description: str) -> dict:
     """
@@ -245,17 +257,12 @@ def build_feature_args(fov: str, dirs: dict, args: argparse.Namespace):
 
 
 def build_reallocation_args(fov: str, dirs: dict, args: argparse.Namespace):
-    """
-    Build arguments for the reallocation and normalization stage for a given FOV.
-    """
-    morph_csv = os.path.join(dirs["morph"], f"{os.path.basename(fov)}.csv")
-    protein_csv = os.path.join(dirs["protein"], f"{os.path.basename(fov)}.csv")
+    morph_path = os.path.join(dirs["morph"], f"{os.path.basename(fov)}.csv")
+    protein_path = os.path.join(dirs["protein"], f"{os.path.basename(fov)}.csv")
 
-    # Read CSV files for morphology and protein features.
-    morph_df = pd.read_csv(morph_csv)
-    protein_df = pd.read_csv(protein_csv)
+    morph_df = pd.read_csv(morph_path)
+    protein_df = pd.read_csv(protein_path)
 
-    # Prepare dummy object for required masks; replace with real implementation if available.
     morph_features = {"mask": None, "membrane_mask": None}
 
     return (
@@ -270,6 +277,7 @@ def build_reallocation_args(fov: str, dirs: dict, args: argparse.Namespace):
         args.use_denoised,
         args.log_level
     )
+
 
 
 def create_adata(args: argparse.Namespace) -> None:

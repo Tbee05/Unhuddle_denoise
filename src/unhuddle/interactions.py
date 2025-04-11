@@ -104,11 +104,15 @@ def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6, u
                 mean_intensity[(row["Label"], marker)] = row[col]
 
     def get_marker_intensity(label, marker):
+        val = None
         if use_denoised:
-            return denoised_intensity.get((label, marker),
-                   mean_intensity.get((label, marker), 0.0))
-        else:
-            return mean_intensity.get((label, marker), 0.0)
+            val = denoised_intensity.get((label, marker))
+        if val is None:
+            val = mean_intensity.get((label, marker))
+        if val is None or np.isnan(val):
+            logger.warning(f"⚠️ Intensity missing or NaN for {label}, {marker}")
+            return 0.0
+        return max(val, 0.0)  # ensures positivity
 
     reallocation = defaultdict(lambda: {
         "taken_intensity": defaultdict(float),
@@ -133,7 +137,11 @@ def compute_reallocation_with_checks(interactions, protein_features, tol=1e-6, u
         for marker in markers:
             values = [interactions[c]["intensities"].get(marker, 0.0) for c in coords]
             total = sum(values)
-            weights = [max(get_marker_intensity(i, marker), 0) for i in involved]
+            weights = []
+            for i in involved:
+                val = get_marker_intensity(i, marker)
+                weights.append(max(val, 0.0))  # no crash
+
             denom = sum(weights)
 
             if denom > 0:
