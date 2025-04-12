@@ -213,7 +213,8 @@ def compute_solo_border_pixels(cell_mask, membrane_mask, fov_folder, markers):
             if 0 <= ny < cell_mask.shape[0] and 0 <= nx < cell_mask.shape[1]:
                 neighbors.append(cell_mask[ny, nx])
 
-        if all(n == 0 for n in neighbors):
+        # Accept if all neighbors are either background or same label
+        if all(n in (0, current) for n in neighbors):
             solo_pixels[int(current)].append((y, x))
 
     logger.debug(f"🧭 Found {sum(len(v) for v in solo_pixels.values())} solo-border pixels across {len(solo_pixels)} cells")
