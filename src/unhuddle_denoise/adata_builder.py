@@ -135,14 +135,4 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
     adata.write_h5ad(adata_output_path)
     print(f"AnnData saved to: {adata_output_path}\n\n")
 
-    # QC plot
-    data = adata.obs["summed_intensity"]
-    fig, axes = plt.subplots(2, 1, figsize=(10, 8))
-    bins_a = np.arange(0, 45 + 0.2, 0.2)
-    axes[0].hist(data, bins=bins_a)
-    axes[0].set_title("Summed Intensity (0–45)")
-    axes[1].hist(data, bins=100)
-    axes[1].set_title("Summed Intensity (Full Range)")
-    plt.tight_layout()
-    plt.savefig(os.path.join(qc_dir, "total_intensity_distribution.png"))
-    plt.close()
+
