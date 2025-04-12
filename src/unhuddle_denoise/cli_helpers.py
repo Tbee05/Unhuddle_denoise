@@ -333,7 +333,7 @@ def create_adata(args: argparse.Namespace) -> None:
             output_base_path=args.output_base_path,
             working_path=args.base_path,
             output_adata_name="adata1.h5ad",
-            max_workers=min(args.max_workers, 8)
+            max_workers=1
         )
     except Exception as e:
         logging.error(f"❌ AnnData creation failed: {e}")
