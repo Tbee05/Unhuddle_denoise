@@ -110,8 +110,11 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
         return adata
 
     fovs = get_fov_list()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        adatas = list(tqdm(pool.map(process_fov, fovs), total=len(fovs), desc="Constructing AnnData"))
+    adatas = []
+    for fov in tqdm(fovs, desc="Constructing AnnData"):
+        adata = process_fov(fov)
+        if adata is not None:
+            adatas.append(adata)
 
     adatas = [a for a in adatas if a is not None]
     if not adatas:
