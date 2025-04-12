@@ -56,8 +56,10 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
             "sum": f"{output_base_path}/unhuddle_sum/{fov}.csv",
             "orig_sum": f"{output_base_path}/original_sum/{fov}.csv",
             "morph": f"{output_base_path}/morphology_features/{fov}.csv",
+            "denoised_intensity": f"{output_base_path}/unhuddle_denoised_normalized/{fov}.csv",
+            "denoised_sum": f"{output_base_path}/unhuddle_denoised_sum/{fov}.csv",
         }
-        if not all(os.path.exists(p) for p in paths.values()):
+        if not all(os.path.exists(paths[k]) for k in ["intensity", "sum", "orig_sum", "morph"]):
             return None
 
         # Load and preprocess
@@ -65,8 +67,14 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
         sum_unhuddle = convert_numeric(load_df(paths["sum"], fov))
         sum_orig = convert_numeric(load_df(paths["orig_sum"], fov))
         morph = convert_numeric(load_df(paths["morph"], fov))
+        denoised_intensity = None
+        denoised_sum = None
+        if os.path.exists(paths["denoised_intensity"]):
+            denoised_intensity = convert_numeric(load_df(paths["denoised_intensity"], fov))
+        if os.path.exists(paths["denoised_sum"]):
+            denoised_sum = convert_numeric(load_df(paths["denoised_sum"], fov))
 
-        for df in [intensity, sum_unhuddle, sum_orig, morph]:
+        for df in [intensity, sum_unhuddle, sum_orig, morph, denoised_intensity, denoised_sum]:
             df.set_index("cell_id", inplace=True)
 
         # Morph QC
@@ -91,6 +99,11 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
         adata = AnnData(X=intensity, obs=morph, obsm=obsm)
         adata.layers["sum_unhuddle"] = sum_unhuddle.drop(columns=["Label"], errors="ignore").values
         adata.layers["sum_original"] = sum_orig.drop(columns=["Label"], errors="ignore").values
+        if denoised_intensity is not None:
+            adata.layers["denoised"] = denoised_intensity.drop(columns=["Label"], errors="ignore").values
+        if denoised_sum is not None:
+            adata.layers["sum_denoised"] = denoised_sum.drop(columns=["Label"], errors="ignore").values
+
         adata.obs["summed_intensity"] = adata.layers["sum_unhuddle"].sum(axis=1)
 
         return adata
