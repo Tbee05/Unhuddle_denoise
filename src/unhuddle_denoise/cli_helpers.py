@@ -1,11 +1,12 @@
 import os
+import sys
 import glob
 import logging
 import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
 from tqdm import tqdm
-
+from datetime import datetime
 
 _LOGGING_INITIALIZED = False
 
@@ -136,6 +137,16 @@ def parse_arguments() -> argparse.Namespace:
                         help="Experimental, uses cohort level data to denoise reallocation factors")
     return parser.parse_args()
 
+def save_cli_call(output_base_path, filename="cli_call.txt"):
+    """Save the full CLI call to a file inside the output directory."""
+    cmd = " ".join([os.path.basename(sys.argv[0])] + sys.argv[1:])
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    full_output_path = os.path.join(output_base_path, filename)
+    os.makedirs(output_base_path, exist_ok=True)
+    with open(full_output_path, "w") as f:
+        f.write(f"# Command run at {timestamp}\n")
+        f.write(cmd + "\n")
+    return full_output_path
 
 def list_available_markers(args: argparse.Namespace) -> None:
     """

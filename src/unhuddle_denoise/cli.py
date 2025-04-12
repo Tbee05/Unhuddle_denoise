@@ -13,7 +13,8 @@ from unhuddle_denoise.cli_helpers import (
     build_reallocation_args,
     run_parallel_stage,
     result_failed,
-    create_adata
+    create_adata,
+    save_cli_call
 )
 
 # These must remain top-level for multiprocessing compatibility
@@ -61,6 +62,9 @@ def main():
     if not fov_folders:
         print("❌ No FOVs selected for processing.")
         return
+    # Save CLI call for traceability
+    cli_path = save_cli_call(args.output_base_path)
+    logger.info(f"📝 CLI call saved to: {cli_path}")
 
     # Stage 1: Feature Extraction
     results_stage1 = run_parallel_stage(
