@@ -8,7 +8,10 @@ import concurrent.futures
 from tqdm import tqdm
 from anndata import AnnData, concat
 from tifffile import imread
+import matplotlib
+matplotlib.use("Agg")  # ✅ Set backend first
 import matplotlib.pyplot as plt
+
 import logging
 logger = logging.getLogger(__name__)
 
