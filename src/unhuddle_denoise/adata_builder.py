@@ -97,14 +97,23 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
                             "Nucleus_Centroid_Row", "Nucleus_Centroid_Col"], errors="ignore", inplace=True)
         intensity.drop(columns=["Label"], errors="ignore", inplace=True)
 
-        adata = AnnData(X=intensity, obs=morph, obsm=obsm)
-        adata.layers["sum_unhuddle"] = sum_unhuddle.drop(columns=["Label"], errors="ignore").values
-        adata.layers["sum_original"] = sum_orig.drop(columns=["Label"], errors="ignore").values
+        # Decide what goes into .X
         if denoised_intensity is not None:
-            adata.layers["denoised"] = denoised_intensity.drop(columns=["Label"], errors="ignore").values
-        if denoised_sum is not None:
-            adata.layers["sum_denoised"] = denoised_sum.drop(columns=["Label"], errors="ignore").values
+            denoised_arr = denoised_intensity.drop(columns=["Label"], errors="ignore").values
+            adata = AnnData(X=denoised_arr, obs=morph, obsm=obsm)
+            adata.uns["X_source"] = "normalized_unhuddle_denoised"
+        else:
+            adata = AnnData(X=norm_unhuddle, obs=morph, obsm=obsm)
+            adata.uns["X_source"] = "normalized_unhuddle"
 
+        # Store the summed layers only
+        adata.layers["sum_unhuddle"] = sum_unhuddle_arr
+        adata.layers["sum_original"] = sum_orig_arr
+
+        if denoised_sum is not None:
+            adata.layers["sum_unhuddle_denoised"] = denoised_sum.drop(columns=["Label"], errors="ignore").values
+
+        # Convenience summary stat
         adata.obs["summed_intensity"] = adata.layers["sum_unhuddle"].sum(axis=1)
 
         return adata
