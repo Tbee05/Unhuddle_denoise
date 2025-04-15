@@ -108,9 +108,12 @@ def create_deepcell_mask_overlay(fov_path,
         logger.warning(f"Required markers for red and green channels not found in {fov_path}.")
         return None
 
-    red_8 = scale_contrast(red_channel)
-    green_8 = scale_contrast(green_channel)
-    blue_8 = scale_contrast(blue_channel) if blue_channel is not None else np.zeros_like(red_8)
+    def sum_and_cap(arr):
+        return np.clip(arr, 0, 1)  # Cap at 1, assuming input is in [0–1] or close
+
+    red_8 = (sum_and_cap(red_channel) * 255).astype(np.uint8)
+    green_8 = (sum_and_cap(green_channel) * 255).astype(np.uint8)
+    blue_8 = (sum_and_cap(blue_channel) * 255).astype(np.uint8) if blue_channel is not None else np.zeros_like(red_8)
 
     overlay = np.stack((red_8, green_8, blue_8), axis=-1)
 
