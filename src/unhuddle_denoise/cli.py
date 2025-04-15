@@ -61,7 +61,17 @@ def main():
 
     if not fov_folders:
         print("❌ No FOVs selected for processing.")
-        return
+
+        if args.create_adata:
+            proceed = input("⚠️ No FOVs found. Do you still want to run only AnnData creation? (y/n): ").strip().lower()
+            if proceed == "y":
+                create_adata(args)
+            else:
+                print("🚫 Aborted AnnData creation.")
+            return
+        else:
+            return
+
     # Save CLI call for traceability
     cli_path = save_cli_call(args.output_base_path)
     logger.info(f"📝 CLI call saved to: {cli_path}")
