@@ -107,7 +107,9 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
             adata.uns["X_source"] = "normalized_unhuddle"
 
         # Store the summed layers only
+        sum_unhuddle_arr = sum_unhuddle.drop(columns=["Label"], errors="ignore").values
         adata.layers["sum_unhuddle"] = sum_unhuddle_arr
+        sum_orig_arr = sum_orig.drop(columns=["Label"], errors="ignore").values
         adata.layers["sum_original"] = sum_orig_arr
 
         if denoised_sum is not None:
