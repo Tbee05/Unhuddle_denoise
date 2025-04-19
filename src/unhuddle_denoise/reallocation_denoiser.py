@@ -4,8 +4,107 @@ import numpy as np
 import logging
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from matplotlib.backends.backend_pdf import PdfPages
 import warnings
 warnings.filterwarnings("ignore", message=".*partition.*MaskedArray.*")
+
+logger = logging.getLogger(__name__)
+
+
+
+def save_signal_noise_qc_from_df(
+    df: pd.DataFrame,
+    markers: list[str],
+    output_pdf="signal_noise_qc.pdf",
+    area_col="Area",
+    layer_suffix="_ExclusionMembrane_Sum_Intensity",
+    apex_anchor_x=15,
+    apex_anchor_y=0,
+    gridsize=80,
+    density_quantile=0.1,
+    min_cells_per_bin=10,
+    cols=3,
+    x_max=300
+):
+    logger = logging.getLogger("unhuddle")
+    logger.info("📊 Starting signal/noise QC plotting for %d markers...", len(markers))
+
+    n = len(markers)
+    rows = int(np.ceil(n / cols))
+
+    with PdfPages(output_pdf) as pdf:
+        fig, axs = plt.subplots(rows, cols, figsize=(cols * 5, rows * 5), dpi=150)
+        axs = axs.flatten()
+
+        for i, marker in enumerate(markers):
+            logger.debug(f"🔬 Processing marker: {marker}")
+            colname = f"{marker}{layer_suffix}"
+            if colname not in df.columns or area_col not in df.columns:
+                logger.warning(f"⚠️ Missing required columns for marker '{marker}', skipping.")
+                axs[i].text(0.5, 0.5, "Data missing", ha='center', va='center', transform=axs[i].transAxes)
+                continue
+
+            area = df[area_col].values
+            intensity = df[colname].values
+
+            mask = area >= 10
+            area_filt = area[mask]
+            intensity_filt = intensity[mask]
+
+            ax = axs[i]
+            hb = ax.hexbin(area_filt, intensity_filt, gridsize=gridsize, cmap='Greys', bins='log', mincnt=1)
+
+            counts = hb.get_array()
+            xbins = hb.get_offsets()[:, 0]
+            ybins = hb.get_offsets()[:, 1]
+
+            density_thresh = np.quantile(counts, density_quantile)
+            keep_mask = (counts > density_thresh) & (counts >= min_cells_per_bin)
+
+            if not np.any(keep_mask):
+                logger.warning(f"⚠️ No valid apex region for marker '{marker}', skipping fit.")
+                ax.text(0.5, 0.5, "No valid peak", ha='center', va='center', transform=ax.transAxes, color='red')
+                continue
+
+            top_x = xbins[keep_mask]
+            top_y = ybins[keep_mask]
+            peak_idx = np.argmax(top_y)
+            apex_area = top_x[peak_idx]
+            apex_intensity = top_y[peak_idx]
+
+            signal_slope = (apex_intensity - apex_anchor_y) / (apex_area - apex_anchor_x)
+            signal_intercept = apex_anchor_y - signal_slope * apex_anchor_x
+            x_signal = np.linspace(apex_anchor_x, x_max, 200)
+            y_signal = signal_slope * x_signal + signal_intercept
+            ax.plot(x_signal, y_signal, color='orange', lw=2, label="Signal fit")
+
+            noise_mask = (xbins > apex_area) & (counts > density_thresh) & (counts >= min_cells_per_bin)
+            if np.any(noise_mask):
+                X_noise = xbins[noise_mask].reshape(-1, 1)
+                y_noise = ybins[noise_mask]
+                X_noise_rel = (X_noise - apex_area)
+                model = LinearRegression(fit_intercept=False).fit(X_noise_rel, y_noise)
+                noise_slope = model.coef_[0]
+
+                x_noise = np.linspace(apex_area, x_max, 200)
+                y_noise = noise_slope * (x_noise - apex_area)
+                ax.plot(x_noise, y_noise, color='green', lw=2, label="Noise fit")
+
+            ax.plot(apex_area, apex_intensity, 'ro', label=f"Apex @ {apex_area:.1f}")
+            ax.axvline(apex_area, linestyle='--', color='orange')
+            ax.set_title(marker)
+            ax.set_xlabel("Area")
+            ax.set_ylabel("Intensity")
+            ax.legend(fontsize=8)
+
+        for j in range(len(markers), len(axs)):
+            axs[j].axis("off")
+
+        plt.tight_layout()
+        pdf.savefig(fig, bbox_inches='tight')
+        plt.close(fig)
+
+    logger.info("✅ QC PDF saved to: %s", output_pdf)
 
 
 def run_denoising_pipeline_on_dataframe(
@@ -216,6 +315,18 @@ def compute_denoised_reallocation_factors(protein_csv_paths, protein_features_di
     logger.info("🚀 Running cohort-wide denoising on %d markers across %d FOVs...", len(markers), len(fov_ids))
 
     denoised_df = run_denoising_pipeline_on_dataframe(full_df, markers)
+    qc_output_pdf = os.path.join(
+        os.path.dirname(protein_csv_paths[0]).replace("protein_features", "QC"),
+        "denoiser_QC.pdf"
+    )
+
+    save_signal_noise_qc_from_df(
+        df=full_df,
+        markers=markers,
+        output_pdf=qc_output_pdf,
+        density_quantile=0.1,
+        min_cells_per_bin=20
+    )
 
     for fov_name, group in denoised_df.groupby("fov"):
         denoised_cols = [

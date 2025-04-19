@@ -144,7 +144,7 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
         if os.path.exists(mask_path):
             adata.uns["spatial"][fov] = {"segmentation": imread(mask_path)}
     # Dimension reduction
-    fitsne_path = os.path.join(output_base, "fitsne_coords", f"{fov}.csv")
+    fitsne_path = os.path.join(output_base_path, "fitsne_coords", f"{fov}.csv")
     if os.path.exists(fitsne_path):
         coords = pd.read_csv(fitsne_path).values
         adata.obsm["X_fitsne"] = coords  # or store per-FOV temporarily and merge later

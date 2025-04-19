@@ -135,7 +135,7 @@ def main():
             print("⚠️ Skipping QC (user passed --no_qc)")
             return
 
-        from cli_helpers import run_qc_pipeline
+
         run_qc_pipeline(args, adata)
 
 

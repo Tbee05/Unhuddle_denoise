@@ -138,7 +138,8 @@ def parse_arguments() -> argparse.Namespace:
                         help="Experimental, uses cohort level data to denoise reallocation factors")
     parser.add_argument("--fitsne", action="store_true",
                         help="Run dimension reduction using fitSNE and receive QC filtering")
-    parser.add_argument("--qc", action="store_true", help="Run QC filtering on finalized AnnData object.")
+    parser.add_argument("--no_qc", action="store_true", help="Avoid QC filtering on finalized AnnData object.")
+    parser.add_argument("--low_intensity_threshold", type=int, default=10, help="Minimum total intensity over all marker to accept cell")
     return parser.parse_args()
 
 def save_cli_call(output_base_path, filename="cli_call.txt"):
@@ -194,7 +195,8 @@ def setup_output_directories(output_base: str) -> dict:
         "unhuddle_denoised_norm": os.path.join(output_base, "unhuddle_denoised_normalized"),
         "metadata_denoised": os.path.join(output_base, "metadata_denoise"),
         "adata": os.path.join(output_base, "adata_objects"),
-        "fitsne": os.path.join(output_base, "fitsne_coords")
+        "fitsne": os.path.join(output_base, "fitsne_coords"),
+        "QC": os.path.join(output_base, "QC")
     }
     for directory in dirs.values():
         os.makedirs(directory, exist_ok=True)
@@ -311,7 +313,8 @@ def build_feature_args(fov: str, dirs: dict, args: argparse.Namespace):
         args.log_level,
         args.deepcell_resolution,
         args.nuclear_markers_overlay,
-        args.membrane_markers_overlay,
+        args.membrane_markers_overlay
+
     )
 
 
@@ -345,7 +348,7 @@ def create_adata(args: argparse.Namespace) -> None:
     logging.info("\n📦 Creating unified AnnData object...")
     from unhuddle_denoise.adata_builder import build_adata_from_outputs
     try:
-        build_adata_from_outputs(
+        adata = build_adata_from_outputs(
             output_base_path=args.output_base_path,
             working_path=args.base_path,
             output_adata_name="adata1.h5ad",
@@ -360,7 +363,7 @@ def create_adata(args: argparse.Namespace) -> None:
 
 def fitsne(args):
     print("🚀 Running FIt-SNE dimensionality reduction step...")
-    from src.unhuddle_denoise.run_fitsne import run_fitsne_dimension_reduction
+    from unhuddle_denoise.run_fitsne import run_fitsne_dimension_reduction
 
     fitsne_dir = os.path.join(args.output_base_path, "fitsne_coords")
     input_dir = os.path.join(args.output_base_path, "unhuddle_denoised_normalized")
@@ -377,7 +380,7 @@ def fitsne(args):
 
 
 def run_qc_pipeline(args, adata):
-    from src.unhuddle_denoise.qc_pipeline import run_qc_from_memory
+    from unhuddle_denoise.qc_pipeline import run_qc_from_memory
 
     print("🚀 Running QC filtering pipeline ...")
     run_qc_from_memory(args, adata)  # Correct in-memory call
