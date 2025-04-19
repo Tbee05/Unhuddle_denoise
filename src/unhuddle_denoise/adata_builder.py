@@ -143,8 +143,13 @@ def build_adata_from_outputs(output_base_path, working_path=None, output_adata_n
         mask_path = os.path.join(working_path, fov, "deepcel_mask.tiff")
         if os.path.exists(mask_path):
             adata.uns["spatial"][fov] = {"segmentation": imread(mask_path)}
+    # Dimension reduction
+    fitsne_path = os.path.join(output_base, "fitsne_coords", f"{fov}.csv")
+    if os.path.exists(fitsne_path):
+        coords = pd.read_csv(fitsne_path).values
+        adata.obsm["X_fitsne"] = coords  # or store per-FOV temporarily and merge later
 
     adata.write_h5ad(adata_output_path)
     print(f"AnnData saved to: {adata_output_path}\n\n")
-
+    return adata
 

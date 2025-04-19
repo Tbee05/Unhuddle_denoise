@@ -14,7 +14,9 @@ from unhuddle_denoise.cli_helpers import (
     run_parallel_stage,
     result_failed,
     create_adata,
-    save_cli_call
+    save_cli_call,
+    fitsne,
+    run_qc_pipeline
 )
 
 # These must remain top-level for multiprocessing compatibility
@@ -117,9 +119,25 @@ def main():
         print(f"📄 Cell-level morphology metrics: {dirs['morph']}")
         print(f"📄 Raw/pre-normalization values: {args.output_base_path}\n")
 
+    # After running core UNHUDDLE pipeline and before adata_builder:
+    if args.fitsne:
+        fitsne(args)
+
     # Optional: build AnnData
     if args.create_adata:
-        create_adata(args)
+        adata = create_adata(args)
+
+        if adata is None:
+            print("❌ AnnData creation failed. Skipping QC.")
+            return
+
+        if args.no_qc:
+            print("⚠️ Skipping QC (user passed --no_qc)")
+            return
+
+        from cli_helpers import run_qc_pipeline
+        run_qc_pipeline(args, adata)
+
 
 if __name__ == "__main__":
     main()

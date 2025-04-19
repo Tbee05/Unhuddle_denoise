@@ -8,6 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
 
+
 _LOGGING_INITIALIZED = False
 
 def setup_logging(log_level: str) -> None:
@@ -135,6 +136,9 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--use_denoised", action="store_true",
                         help="Experimental, uses cohort level data to denoise reallocation factors")
+    parser.add_argument("--fitsne", action="store_true",
+                        help="Run dimension reduction using fitSNE and receive QC filtering")
+    parser.add_argument("--qc", action="store_true", help="Run QC filtering on finalized AnnData object.")
     return parser.parse_args()
 
 def save_cli_call(output_base_path, filename="cli_call.txt"):
@@ -189,7 +193,8 @@ def setup_output_directories(output_base: str) -> dict:
         "unhuddle_denoised_sum": os.path.join(output_base, "unhuddle_denoised_sum"),
         "unhuddle_denoised_norm": os.path.join(output_base, "unhuddle_denoised_normalized"),
         "metadata_denoised": os.path.join(output_base, "metadata_denoise"),
-        "adata": os.path.join(output_base, "adata_objects")
+        "adata": os.path.join(output_base, "adata_objects"),
+        "fitsne": os.path.join(output_base, "fitsne_coords")
     }
     for directory in dirs.values():
         os.makedirs(directory, exist_ok=True)
@@ -346,6 +351,34 @@ def create_adata(args: argparse.Namespace) -> None:
             output_adata_name="adata1.h5ad",
             max_workers=1
         )
+        return adata
     except Exception as e:
         logging.error(f"❌ AnnData creation failed: {e}")
         print(f"[ERROR] AnnData creation failed: {e}\n")
+        return None
+
+
+def fitsne(args):
+    print("🚀 Running FIt-SNE dimensionality reduction step...")
+    from src.unhuddle_denoise.run_fitsne import run_fitsne_dimension_reduction
+
+    fitsne_dir = os.path.join(args.output_base_path, "fitsne_coords")
+    input_dir = os.path.join(args.output_base_path, "unhuddle_denoised_normalized")
+
+    run_fitsne_dimension_reduction(
+        output_base=args.output_base_path,
+        input_dir=input_dir,
+        fitsne_dir=fitsne_dir,
+        perplexity=30,  # optionally expose this as a CLI argument
+        threads=args.max_workers  # reuse the same parallelism
+    )
+
+    print(f"✅ FIt-SNE coordinates saved to {fitsne_dir}")
+
+
+def run_qc_pipeline(args, adata):
+    from src.unhuddle_denoise.qc_pipeline import run_qc_from_memory
+
+    print("🚀 Running QC filtering pipeline ...")
+    run_qc_from_memory(args, adata)  # Correct in-memory call
+
